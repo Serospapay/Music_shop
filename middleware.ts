@@ -1,0 +1,36 @@
+import { NextRequest, NextResponse } from "next/server";
+import { ADMIN_COOKIE_NAME, verifyAdminSessionJwt } from "@/lib/admin-session";
+
+export async function middleware(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+
+  if (!pathname.startsWith("/admin")) {
+    return NextResponse.next();
+  }
+
+  if (pathname === "/admin/login") {
+    return NextResponse.next();
+  }
+
+  const envPassword = process.env.ADMIN_PASSWORD;
+  if (!envPassword) {
+    const loginUrl = new URL("/admin/login", request.url);
+    loginUrl.searchParams.set("error", "config");
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const sessionToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value ?? "";
+  const isValid = await verifyAdminSessionJwt(sessionToken);
+
+  if (!isValid) {
+    const loginUrl = new URL("/admin/login", request.url);
+    loginUrl.searchParams.set("next", `${pathname}${search}`);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ["/admin/:path*"],
+};

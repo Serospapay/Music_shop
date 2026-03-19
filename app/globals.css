@@ -1,0 +1,192 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg-deep: #060607;
+  --bg-elevated: #0e0e12;
+  --mesh-amber: rgba(212, 165, 116, 0.09);
+  --mesh-cyan: rgba(126, 184, 218, 0.06);
+  --mesh-violet: rgba(167, 139, 250, 0.04);
+}
+
+/* Ледь помітний «дрейф» кольорових плям на фоні (GPU: лише transform) */
+@keyframes bg-mesh-drift {
+  0% {
+    transform: translate3d(-1.5%, -1%, 0) scale(1.03);
+  }
+  25% {
+    transform: translate3d(1.2%, 0.6%, 0) scale(1.05);
+  }
+  50% {
+    transform: translate3d(0.8%, 1.4%, 0) scale(1.02);
+  }
+  75% {
+    transform: translate3d(-0.9%, 0.3%, 0) scale(1.04);
+  }
+  100% {
+    transform: translate3d(-1.5%, -1%, 0) scale(1.03);
+  }
+}
+
+@keyframes bg-mesh-breathe {
+  0%,
+  100% {
+    opacity: 0.92;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+html {
+  background-color: var(--bg-deep);
+}
+
+body {
+  position: relative;
+  isolation: isolate;
+  font-family: var(--font-dm-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background-color: var(--bg-deep);
+  background-image: linear-gradient(180deg, var(--bg-deep) 0%, #0a0a0c 40%, var(--bg-deep) 100%);
+  background-attachment: fixed;
+}
+
+/* Анімований mesh поверх базового градієнта; трохи більший за вікно — без обрізання при русі */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -6%;
+  width: 112%;
+  height: 112%;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(ellipse 130% 90% at 50% -25%, var(--mesh-amber), transparent 55%),
+    radial-gradient(ellipse 70% 55% at 100% 30%, var(--mesh-cyan), transparent 50%),
+    radial-gradient(ellipse 55% 45% at 0% 85%, var(--mesh-violet), transparent 45%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  animation:
+    bg-mesh-drift 96s ease-in-out infinite alternate,
+    bg-mesh-breathe 28s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    animation: none;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 1;
+  }
+}
+
+@layer components {
+  /* Панелі та картки */
+  .ui-surface {
+    @apply rounded-2xl border border-brand-500/15 bg-surface-850/80 shadow-card backdrop-blur-sm;
+  }
+
+  .ui-surface-muted {
+    @apply rounded-2xl border border-brand-500/15 bg-surface-850/60 shadow-lg backdrop-blur-sm;
+  }
+
+  .ui-surface-inset {
+    @apply rounded-xl border border-brand-500/15 bg-surface-900/95;
+  }
+
+  /* Панель без blur (фото, скелетони) */
+  .ui-frame {
+    @apply rounded-2xl border border-brand-500/15 bg-surface-850 shadow-card;
+  }
+
+  /* Форми */
+  .ui-label {
+    @apply text-sm text-zinc-400;
+  }
+
+  .ui-input {
+    @apply w-full rounded-xl border border-brand-500/20 bg-surface-900 px-3 py-2.5 text-sm text-white outline-none transition-all focus:border-brand-400/50 focus:ring-1 focus:ring-brand-400/15 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .ui-input-file {
+    @apply w-full rounded-xl border border-brand-500/20 bg-surface-900 px-3 py-2.5 text-sm text-zinc-200 outline-none transition-all file:mr-3 file:rounded-lg file:border-0 file:bg-brand-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-surface-950 focus:border-brand-400/50 focus:ring-1 focus:ring-brand-400/15 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  /* Кнопки */
+  .ui-btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-surface-950 shadow-brand-sm transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .ui-btn-primary-compact {
+    @apply inline-flex items-center justify-center rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-surface-950 shadow-brand-sm transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .ui-btn-primary-block {
+    @apply inline-flex w-full items-center justify-center rounded-xl bg-brand-500 px-5 py-3 text-sm font-semibold text-surface-950 shadow-brand-sm transition hover:scale-[1.01] hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .ui-btn-primary-lg {
+    @apply inline-flex w-full items-center justify-center rounded-xl bg-brand-500 px-6 py-4 text-base font-semibold text-surface-950 shadow-brand-sm transition hover:scale-[1.01] hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-surface-700 disabled:text-zinc-400 disabled:shadow-none disabled:hover:scale-100;
+  }
+
+  .ui-btn-outline {
+    @apply inline-flex items-center justify-center rounded-xl border border-brand-500/25 px-5 py-2.5 text-sm font-semibold text-brand-100 transition hover:border-brand-400/50 hover:bg-brand-500/10 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .ui-btn-outline-compact {
+    @apply inline-flex items-center justify-center rounded-xl border border-brand-500/25 px-3 py-2 text-sm font-medium text-brand-100 transition hover:border-brand-400/45 hover:bg-brand-500/10 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .ui-icon-btn {
+    @apply rounded-full border border-brand-500/20 p-2 text-zinc-300 transition-all hover:border-brand-400/40 hover:text-brand-100;
+  }
+
+  .ui-stepper-btn {
+    @apply rounded-lg border border-brand-500/20 p-1.5 text-zinc-300 transition-all hover:border-brand-400/40 hover:text-brand-100;
+  }
+
+  /* Оверлеї та розділювачі */
+  .ui-overlay-scrim {
+    @apply bg-surface-950/75 backdrop-blur-sm;
+  }
+
+  .ui-divider {
+    @apply border-brand-500/10;
+  }
+
+  /* Типографіка секцій */
+  .ui-page-eyebrow {
+    @apply text-xs uppercase tracking-[0.2em] text-brand-500/80;
+  }
+
+  .ui-section-title {
+    @apply font-display text-2xl font-normal text-white sm:text-3xl;
+  }
+
+  .ui-body {
+    @apply text-sm leading-relaxed text-zinc-400 sm:text-base;
+  }
+
+  /* Таблиці */
+  .ui-table-shell {
+    @apply w-full overflow-x-auto rounded-2xl border border-brand-500/15 bg-surface-850/80 shadow-card backdrop-blur-sm;
+  }
+
+  .ui-table-head {
+    @apply border-b border-brand-500/15 bg-surface-900;
+  }
+
+  .ui-table-row {
+    @apply border-b border-brand-500/10 last:border-b-0;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
