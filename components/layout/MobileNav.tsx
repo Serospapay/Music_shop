@@ -9,9 +9,10 @@ export type NavItem = { href: string; label: string };
 
 type MobileNavProps = {
   links: NavItem[];
+  user?: { name: string } | null;
 };
 
-export function MobileNav({ links }: MobileNavProps) {
+export function MobileNav({ links, user }: MobileNavProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -79,6 +80,36 @@ export function MobileNav({ links }: MobileNavProps) {
                 </Link>
               );
             })}
+            <div className="mt-6 border-t border-brand-500/15 pt-6">
+              {user ? (
+                <>
+                  <p className="px-4 pb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                    Акаунт
+                  </p>
+                  <Link
+                    href="/account"
+                    className="block rounded-xl px-4 py-3.5 text-base font-medium text-zinc-200 transition hover:bg-surface-800 hover:text-white"
+                  >
+                    Мій кабінет ({user.name})
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="block rounded-xl px-4 py-3.5 text-base font-medium text-zinc-200 transition hover:bg-surface-800 hover:text-white"
+                  >
+                    Увійти
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="mt-1 block rounded-xl px-4 py-3.5 text-base font-medium text-brand-200 transition hover:bg-surface-800"
+                  >
+                    Реєстрація
+                  </Link>
+                </>
+              )}
+            </div>
           </nav>
         </div>
       ) : null}

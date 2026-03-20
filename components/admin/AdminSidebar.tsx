@@ -5,6 +5,7 @@ const links = [
   { href: "/admin", label: "Дашборд" },
   { href: "/admin/products", label: "Товари" },
   { href: "/admin/orders", label: "Замовлення" },
+  { href: "/admin/reviews", label: "Відгуки" },
 ];
 
 export function AdminSidebar() {

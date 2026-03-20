@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.gitignore
+*.md
+!README.md
+# Мікросервіси збираються окремими Dockerfile; не тягнути їх у образ web
+services/
+.env
+.env.*
+!.env.example
+logs
+mcps
+.cursor
+terminals

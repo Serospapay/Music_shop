@@ -92,7 +92,8 @@ export function CheckoutForm() {
       <section className="ui-surface p-6 sm:p-8">
         <h2 className="font-display text-2xl font-normal text-white">Дані для доставки</h2>
         <p className="mt-2 text-sm text-zinc-400">
-          Заповніть форму, і ми зв&apos;яжемося для підтвердження замовлення.
+          Заповніть форму, і ми зв&apos;яжемося для підтвердження замовлення. Якщо ви увійшли в акаунт,
+          вкажіть той самий email, що й у профілі — замовлення з&apos;явиться в &quot;Мій кабінет&quot;.
         </p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>

@@ -13,22 +13,27 @@ export function ProductBreadcrumbs({ category, productName }: ProductBreadcrumbs
 
   return (
     <nav
-      className="mb-6 flex flex-wrap items-center gap-1.5 text-sm text-zinc-500"
+      className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-zinc-500"
       aria-label="Навігація по розділах"
     >
-      <Link href="/" className="transition hover:text-brand-200">
+      <Link href="/" className="rounded-md px-1.5 py-0.5 transition hover:bg-brand-500/10 hover:text-brand-200">
         Головна
       </Link>
-      <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-45" strokeWidth={2} aria-hidden />
-      <Link href="/catalog" className="transition hover:text-brand-200">
+      <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-40" strokeWidth={2} aria-hidden />
+      <Link href="/catalog" className="rounded-md px-1.5 py-0.5 transition hover:bg-brand-500/10 hover:text-brand-200">
         Каталог
       </Link>
-      <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-45" strokeWidth={2} aria-hidden />
-      <Link href={catalogCategoryHref} className="transition hover:text-brand-200">
+      <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-40" strokeWidth={2} aria-hidden />
+      <Link
+        href={catalogCategoryHref}
+        className="rounded-md px-1.5 py-0.5 transition hover:bg-brand-500/10 hover:text-brand-200"
+      >
         {category}
       </Link>
-      <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-45" strokeWidth={2} aria-hidden />
-      <span className="max-w-[min(100%,14rem)] truncate text-zinc-400 md:max-w-[24rem]">{productName}</span>
+      <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-40" strokeWidth={2} aria-hidden />
+      <span className="max-w-[min(100%,18rem)] truncate rounded-md px-1.5 py-0.5 text-zinc-300 sm:max-w-[28rem]">
+        {productName}
+      </span>
     </nav>
   );
 }

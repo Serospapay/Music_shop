@@ -9,6 +9,12 @@ const config: Config = {
         display: ["var(--font-instrument)", "Georgia", "serif"],
       },
       colors: {
+        background: "#060607",
+        foreground: "#fafafa",
+        muted: {
+          DEFAULT: "#27272a",
+          foreground: "#a1a1aa",
+        },
         brand: {
           50: "#faf4ec",
           100: "#f0e4d4",

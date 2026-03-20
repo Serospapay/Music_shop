@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 type CardProps = {
   className?: string;
@@ -6,11 +7,11 @@ type CardProps = {
 };
 
 export function Card({ className = "", children }: CardProps) {
-  return <div className={`ui-surface ${className}`}>{children}</div>;
+  return <div className={cn("ui-surface", className)}>{children}</div>;
 }
 
 export function CardHeader({ className = "", children }: CardProps) {
-  return <div className={`p-5 ${className}`}>{children}</div>;
+  return <div className={cn("p-5", className)}>{children}</div>;
 }
 
 export function CardTitle({ className = "", children }: CardProps) {
@@ -22,5 +23,5 @@ export function CardDescription({ className = "", children }: CardProps) {
 }
 
 export function CardContent({ className = "", children }: CardProps) {
-  return <div className={`px-5 pb-5 ${className}`}>{children}</div>;
+  return <div className={cn("px-5 pb-5", className)}>{children}</div>;
 }

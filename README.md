@@ -11,7 +11,9 @@
 - **Сторінка товару:** інтерактивний герой (нахил під курсором, лайтбокс), липка панель на десктопі, розгортання опису, копіювання посилання, схожі товари з тієї ж категорії, мобільний sticky CTA.
 - **Кошик:** Zustand + `localStorage`, бічна панель у хедері.
 - **Оформлення:** форма з валідацією (Zod + RHF), API `POST /api/checkout`, запис замовлення в БД, опційний лист через **Resend**.
-- **Адмінка:** `/admin` — JWT-сесія в cookie (`jose`), пароль з `ADMIN_PASSWORD`; товари (CRUD через server actions), перегляд замовлень.
+- **Покупець:** реєстрація та вхід (`/register`, `/login`), пароль **bcrypt**, JWT у cookie `user_session` (`USER_SESSION_SECRET` або fallback на адмін-секрет). Кабінет `/account` — історія замовлень (якщо email у формі збігався з акаунтом). Відгуки на товарі — з модерацією (`PENDING` → схвалити/відхилити в `/admin/reviews`).
+- **Мікросервіси (для оформлення замовлення):** окремі Node-сервіси **catalog-service** (перевірка товарів/цін) та **order-service** (створення замовлення), з’єднані HTTP; Next.js виступає як **BFF**. Увімкнення: задати `ORDER_SERVICE_URL` + `SERVICE_INTERNAL_TOKEN` (див. `docs/MICROSERVICES.md`, `docker-compose.yml`). Без змінних checkout працює через **монолітний** Prisma у тому ж Next (зручно для локальної розробки).
+- **Адмінка:** `/admin` — JWT-сесія в cookie (`jose`), пароль з `ADMIN_PASSWORD`; товари (CRUD через server actions), перегляд замовлень, модерація відгуків.
 - **Обмеження запитів:** in-memory або **Upstash Redis** для rate limit на чутливих маршрутах.
 - **Завантаження зображень:** `POST /api/upload` для адмінки (збереження в `public`).
 
@@ -64,11 +66,11 @@ copy .env.example .env
 
 | Змінна | Опис |
 |--------|------|
-| `DATABASE_URL` | Рядок підключення MongoDB, напр. `mongodb://127.0.0.1:27017/octave_shop` |
+| `DATABASE_URL` | Рядок підключення MongoDB, напр. `mongodb://127.0.0.1:27017/octave_shop`. **Назва БД в URI** — це та сама база, куди потрапляють `prisma db push` і `npm run db:seed`; якщо змінити лише назву в `.env`, а seed робили в іншу БД, на сайті буде порожній каталог. |
 | `ADMIN_PASSWORD` | Пароль входу в `/admin` |
 | `NEXT_PUBLIC_SITE_URL` | Базовий URL сайту (для metadata, Open Graph, копіювання посилання на товар) |
 
-Решта — опційно: `ADMIN_SESSION_SECRET`, `RESEND_*`, `UPSTASH_*`, `NEXT_IMAGE_REMOTE_HOSTS`. Деталі в `.env.example`.
+Решта — опційно: `ADMIN_SESSION_SECRET`, `USER_SESSION_SECRET` (JWT для покупців; інакше використовується адмін-секрет), **`SERVICE_INTERNAL_TOKEN`** + **`ORDER_SERVICE_URL`** (мікросервіси замовлень), `RESEND_*`, `UPSTASH_*`, `NEXT_IMAGE_REMOTE_HOSTS`. Деталі в `.env.example` та `docs/MICROSERVICES.md`.
 
 ### 3. Схема БД
 
@@ -92,9 +94,17 @@ npm run dev
 
 Відкрийте [http://localhost:3000](http://localhost:3000).
 
+**Якщо «не підтягується БД»:** перевірте `GET /api/health/db` — має бути `{"ok":true,"database":"connected",...}`. Для **`npm run dev` на Windows** у `.env` використовуйте `mongodb://127.0.0.1:27017/octave_shop` і переконайтеся, що MongoDB слухає **27017** (локально або через Docker лише для `mongo`). У **Docker-стеку** (`start.bat`) Next у контейнері підключається до хоста **`mongo`**, не `127.0.0.1` — це вже задано в `docker-compose.yml`; гонка «контейнер стартує раніше за Mongo» знята через **healthcheck** для `mongo`.
+
+### Мікросервіси (каталог + замовлення + Next у Docker)
+
+- **Повний стек:** `docker compose up --build` або **`start.bat`** — піднімаються MongoDB, **catalog-service**, **order-service** та контейнер **web** (Next.js production, порт **3000**). Node на ПК не потрібен.
+- **Каталог у Docker:** сервіс **`db-seed`** у `docker-compose.yml` після здорового Mongo виконує **`prisma db push`** і **`npm run db:seed`** — демо-товари з’являються **автоматично** після кожного `docker compose up --build` (не треба окремо сидити з хоста). Якщо змінювали залежності Prisma — інколи потрібен `docker compose build db-seed --no-cache`. Ручний сид на хості: **`npm run docker:seed`** (коли Mongo на `127.0.0.1:27017`).
+- **Локально лише Next:** `npm run dev`; без `ORDER_SERVICE_URL` checkout іде через Prisma у межах одного процесу.
+
 ### Windows: `start.bat`
 
-У корені репозиторію є `start.bat`: перевіряє Node, за потреби ставить залежності, намагається `prisma generate` (при помилці **EPERM** на Windows скрипт **не зупиняється** — можна продовжити `npm run dev`), далі запускає `npm run dev`.
+Запускає **весь стек у Docker** однією командою: **`docker compose up --build`** — збирає й піднімає **MongoDB**, **catalog-service**, **order-service** та **web** (Next.js production у контейнері). Сайт: **http://localhost:3000**. Потрібні лише **Docker Desktop** і файл **`.env`** (скопіюйте з `.env.example`). Зупинка: **Ctrl+C** у вікні батника (зупиняються всі сервіси). Окремо **Node.js не потрібен** для цього сценарію. Текст у `start.bat` **англійською** (лише ASCII): `cmd.exe` на Windows ламає рядки з кирилицею/UTF-8 у `.bat` і розбиває команди на частини.
 
 ---
 
@@ -107,6 +117,10 @@ npm run dev
 | `npm run start` | Запуск зібраного застосунку |
 | `npm run lint` | ESLint |
 | `npm run db:seed` | Заповнення демо-товарів |
+| `npm run docker:ms` | Docker у фоні: mongo + сервіси + **web** |
+| `npm run docker:up` | Docker у передньому плані (логи в консолі), як `start.bat` |
+| `npm run services:catalog` | Локально без Docker-образів: dev catalog-service (:4001) |
+| `npm run services:order` | Локально: dev order-service (:4002) |
 
 ---
 
@@ -176,3 +190,5 @@ npm run start
 - [Upstash Redis](https://upstash.com/)
 
 Якщо плануєте розвивати UI — див. `docs/PLAN-UI-REFINEMENT.md`.
+
+Системний аналіз (Mermaid: дерево цілей, контекст, DFD, ER) — відкрийте у браузері файл `docs/system-analysis/index.html`.

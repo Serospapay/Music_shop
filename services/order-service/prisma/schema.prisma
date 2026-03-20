@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+/// Мікросервіс замовлень: власна модель без FK на Product (денормалізація позицій)
+model Order {
+  id           String      @id @default(auto()) @map("_id") @db.ObjectId
+  customerName String
+  email        String
+  phone        String
+  address      String
+  totalAmount  Float
+  status       OrderStatus @default(PENDING)
+  createdAt    DateTime    @default(now())
+  userId       String?     @db.ObjectId
+  items        OrderItem[]
+}
+
+model OrderItem {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  orderId     String @db.ObjectId
+  productId   String @db.ObjectId
+  productName String?
+  quantity    Int
+  price       Float
+  order       Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}

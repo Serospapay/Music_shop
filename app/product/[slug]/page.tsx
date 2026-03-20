@@ -1,18 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
-import { ProductPDPExperience } from "@/components/product/ProductPDPExperience";
-import type { RelatedProductDTO } from "@/components/product/ProductRelatedRail";
-
-type RelatedRow = {
-  id: string;
-  name: string;
-  slug: string;
-  imageUrl: string;
-  price: number;
-  inStock: boolean;
-  category: string;
-};
+import { normalizeSpecsJson } from "@/lib/product-specs";
+import { ProductPremiumPage } from "@/components/product/ProductPremiumPage";
+import type { SoundRadarDatum } from "@/components/ui/SoundRadar";
+import { ProductReviewsServer } from "@/components/product/ProductReviewsServer";
 
 type ProductPageProps = {
   params: {
@@ -33,6 +26,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       description: true,
       imageUrl: true,
       slug: true,
+      brand: true,
     },
   });
 
@@ -45,11 +39,14 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       ? `${product.description.slice(0, 157).trimEnd()}...`
       : product.description;
 
+  const brand = product.brand.trim();
+  const title = brand ? `${product.name} — ${brand}` : product.name;
+
   return {
-    title: product.name,
+    title,
     description: shortDescription,
     openGraph: {
-      title: product.name,
+      title,
       description: shortDescription,
       type: "website",
       url: `/product/${product.slug}`,
@@ -63,64 +60,109 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   };
 }
 
-function mapRelated(rows: RelatedRow[]): RelatedProductDTO[] {
-  return rows.map((p) => ({
-    id: p.id,
-    name: p.name,
-    slug: p.slug,
-    imageUrl: p.imageUrl,
-    price: Number(p.price),
-    inStock: p.inStock,
-    category: p.category,
-  }));
-}
+type ProductDbRow = NonNullable<Awaited<ReturnType<typeof prisma.product.findUnique>>>;
+
+type ProductWithJsonFields = ProductDbRow & {
+  stockCount: number;
+  technicalSpecs: unknown;
+  compatibility: unknown;
+};
 
 export default async function ProductPage({ params }: ProductPageProps) {
-  const product = await prisma.product.findUnique({
+  const productRaw = await prisma.product.findUnique({
     where: {
       slug: params.slug,
     },
   });
 
-  if (!product) {
+  if (!productRaw) {
     notFound();
   }
 
-  const relatedRows = await prisma.product.findMany({
+  const product = productRaw as ProductWithJsonFields;
+
+  const related = await prisma.product.findMany({
     where: {
       category: product.category,
       id: { not: product.id },
     },
-    take: 12,
+    take: 4,
     orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      imageUrl: true,
-      price: true,
-      inStock: true,
-      category: true,
-    },
   });
-  const related = mapRelated(relatedRows);
+
   const siteOrigin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const specsLegacy = normalizeSpecsJson(product.specs);
+  const imagesForJsonLd = [product.imageUrl, ...product.imageUrls].filter(Boolean);
+  const skuResolved =
+    product.sku?.trim() || `OCT-${product.slug.replace(/[^a-z0-9]+/gi, "").toUpperCase().slice(0, 20)}`;
+
+  const radarData: SoundRadarDatum[] = [
+    { subject: "Низькі (Bass)", score: 8, fullMark: 10 },
+    { subject: "Середні (Mids)", score: 9, fullMark: 10 },
+    { subject: "Високі (Treble)", score: 7, fullMark: 10 },
+    { subject: "Сцена (Soundstage)", score: 6, fullMark: 10 },
+    { subject: "Ізоляція", score: 8, fullMark: 10 },
+  ];
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description,
+    sku: skuResolved,
+    image: imagesForJsonLd,
+    brand: product.brand.trim()
+      ? {
+          "@type": "Brand",
+          name: product.brand.trim(),
+        }
+      : undefined,
+    offers: {
+      "@type": "Offer",
+      url: `${siteOrigin.replace(/\/$/, "")}/product/${product.slug}`,
+      priceCurrency: "UAH",
+      price: product.price,
+      availability: product.inStock
+        ? "https://schema.org/InStock"
+        : "https://schema.org/OutOfStock",
+    },
+  };
 
   return (
-    <ProductPDPExperience
-      product={{
-        id: product.id,
-        name: product.name,
-        slug: product.slug,
-        description: product.description,
-        price: Number(product.price),
-        category: product.category,
-        imageUrl: product.imageUrl,
-        inStock: product.inStock,
-        createdAt: product.createdAt.toISOString(),
-      }}
-      related={related}
-      siteOrigin={siteOrigin}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <ProductPremiumPage
+        product={{
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          description: product.description,
+          price: Number(product.price),
+          category: product.category,
+          brand: product.brand,
+          sku: skuResolved,
+          imageUrl: product.imageUrl,
+          imageUrls: product.imageUrls ?? [],
+          inStock: product.inStock,
+          stockCount: product.stockCount,
+          warrantyMonths: product.warrantyMonths,
+          technicalSpecs: product.technicalSpecs,
+          compatibility: product.compatibility,
+          specsLegacy,
+        }}
+        related={related}
+        soundProfile={radarData}
+      />
+      <div className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
+        <Suspense
+          fallback={<p className="py-12 text-center text-sm text-zinc-500">Завантаження відгуків...</p>}
+        >
+          <ProductReviewsServer productId={product.id} productSlug={product.slug} />
+        </Suspense>
+      </div>
+    </>
   );
 }

@@ -18,6 +18,7 @@ type ProductStickyMobileCTAProps = {
   price: number;
   inStock: boolean;
   cartItem: CartItem;
+  quantity: number;
   /** Елемент після якого показувати бар (звичайно блок із героєм + верх інфо) */
   sentinelRef: React.RefObject<HTMLElement | null>;
 };
@@ -27,6 +28,7 @@ export function ProductStickyMobileCTA({
   price,
   inStock,
   cartItem,
+  quantity,
   sentinelRef,
 }: ProductStickyMobileCTAProps) {
   const [show, setShow] = useState(false);
@@ -62,9 +64,17 @@ export function ProductStickyMobileCTA({
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs text-zinc-500">{productName}</p>
               <p className="text-sm font-semibold text-brand-100">{formatPriceUah(price)}</p>
+              {quantity > 1 ? (
+                <p className="text-[11px] text-zinc-500">Кількість: {quantity}</p>
+              ) : null}
             </div>
             <div className="w-[min(100%,8.5rem)] shrink-0">
-              <AddToCartButton item={cartItem} disabled={!inStock} variant="compact" />
+              <AddToCartButton
+                item={cartItem}
+                quantity={quantity}
+                disabled={!inStock}
+                variant="compact"
+              />
             </div>
           </div>
         </motion.div>

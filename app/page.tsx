@@ -8,65 +8,50 @@ import type { Product } from "@prisma/client";
 export const dynamic = "force-dynamic";
 
 async function getCarouselSlides(): Promise<CarouselSlide[]> {
-  try {
-    const rows = await prisma.product.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 12,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        imageUrl: true,
-        price: true,
-        category: true,
-      },
-    });
-    return rows.map((p) => ({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      imageUrl: p.imageUrl,
-      category: p.category,
-      price: Number(p.price),
-    }));
-  } catch (error) {
-    console.error("Помилка завантаження каруселі:", error);
-    return [];
-  }
+  const rows = await prisma.product.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 12,
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      imageUrl: true,
+      price: true,
+      category: true,
+    },
+  });
+  return rows.map((p) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    imageUrl: p.imageUrl,
+    category: p.category,
+    price: Number(p.price),
+  }));
 }
 
 async function getLatestProducts(): Promise<Product[]> {
-  try {
-    return await prisma.product.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 4,
-    });
-  } catch (error) {
-    console.error("Помилка отримання новинок:", error);
-    return [];
-  }
+  return prisma.product.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 4,
+  });
 }
 
 async function getCatalogStats() {
-  try {
-    const [productCount, categoryRows] = await Promise.all([
-      prisma.product.count(),
-      prisma.product.findMany({
-        distinct: ["category"],
-        select: { category: true },
-        orderBy: { category: "asc" },
-      }),
-    ]);
-    const categories = categoryRows.map((r) => r.category).filter(Boolean);
-    return {
-      productCount,
-      categories,
-      categoryCount: categories.length,
-    };
-  } catch (error) {
-    console.error("Помилка статистики каталогу:", error);
-    return { productCount: 0, categories: [] as string[], categoryCount: 0 };
-  }
+  const [productCount, categoryRows] = await Promise.all([
+    prisma.product.count(),
+    prisma.product.findMany({
+      distinct: ["category"],
+      select: { category: true },
+      orderBy: { category: "asc" },
+    }),
+  ]);
+  const categories = categoryRows.map((r) => r.category).filter(Boolean);
+  return {
+    productCount,
+    categories,
+    categoryCount: categories.length,
+  };
 }
 
 export default async function HomePage() {

@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mermaid — системний аналіз «Октава»</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      color: #0f172a;
+      background: #f8fafc;
+    }
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0 0 16px;
+      font-size: 22px;
+      line-height: 1.2;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+    .mermaid {
+      width: 100%;
+    }
+
+    .mermaid svg {
+      max-width: 100%;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    @media print {
+      body {
+        padding: 10px;
+      }
+      .wrap {
+        max-width: 100%;
+      }
+      .card {
+        break-inside: avoid;
+      }
+      .mermaid svg {
+        transform: scale(0.92);
+        transform-origin: top center;
+      }
+    }
+    pre {
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Системний аналіз: Mermaid діаграми (Октава — інтернет-магазин музичних інструментів)</h1>
+
+    <section class="card">
+      <h2>1) Дерево цілей (Goal Tree)</h2>
+      <div class="mermaid">
+        %%{init:{'flowchart':{'curve':'linear','ranker':'tight','nodeSpacing':72,'rankSpacing':46}}}%%
+        flowchart TB
+          G0[Розробити<br/>інтернет-магазин<br/>«Октава»]
+          G1[Забезпечити<br/>каталог і пошук]
+          G2[Забезпечити<br/>кошик та замовлення]
+          G3[Забезпечити<br/>відгуки й модерацію]
+          G4[Забезпечити<br/>безпеку та JWT]
+          G5[Забезпечити<br/>оформлення<br/>доставки]
+
+          G0 --> G1
+          G0 --> G2
+          G0 --> G3
+          G0 --> G4
+          G0 --> G5
+
+          G1a[Категорії<br/>фільтри / сортування]
+          G1b[Пошук<br/>за назвою]
+
+          G1 --> G1a
+          G1 --> G1b
+
+          G2x[Побудувати<br/>ланцюг<br/>замовлення]
+          G2a[Checkout<br/>Zod + RHF]
+          G2b[Mongo<br/>orders]
+
+          G2 --> G2x
+          G2x --> G2a
+          G2x --> G2b
+
+          G3x[Цикл<br/>відгуків]
+          G3a[POST відгук<br/>на товар]
+          G3b[модерація<br/>в адмінці]
+
+          G3 --> G3x
+          G3x --> G3a
+          G3x --> G3b
+
+          G4x[Доступ і<br/>сесії]
+          G4a[register/login<br/>bcrypt]
+          G4b[Jose JWT<br/>user + admin]
+
+          G4 --> G4x
+          G4x --> G4a
+          G4x --> G4b
+
+          G5a[Форма адреси<br/>телефон / доставка]
+          G5 --> G5a
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2) Контекстна діаграма (Context)</h2>
+      <div class="mermaid">
+        %%{init:{'flowchart':{'curve':'linear','ranker':'tight','nodeSpacing':74,'rankSpacing':28}}}%%
+        flowchart TB
+          E1[Покупець]
+          P0((Октава<br/>Next.js + Prisma))
+          E2[Адміністратор]
+
+          E1 --|каталог / кошик / checkout / відгуки|--> P0
+          P0 --|товари / підтвердження замовлення|--> E1
+
+          E2 --|товари CRUD / модерація відгуків|--> P0
+          P0 --|списки замовлень / статуси|--> E2
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3) DFD 1-го рівня</h2>
+      <div class="mermaid">
+        %%{init:{'flowchart':{'curve':'linear','ranker':'tight','nodeSpacing':78,'rankSpacing':22}}}%%
+        flowchart TB
+          E1[Покупець]
+          E2[Адміністратор]
+
+          LS[(localStorage<br/>Zustand кошик)]
+
+          P1((Авторизація<br/>bcrypt + jose JWT))
+          D1[(users)]
+
+          P2((Каталог + Checkout<br/>Next.js API))
+          D2[(products)]
+          D3[(orders +<br/>order_items)]
+
+          P3((Відгуки +<br/>адмінка товарів))
+          D4[(reviews)]
+
+          E1 --|email+pass|--> P1
+          P1 --|find/create user|--> D1
+          D1 --|user doc|--> P1
+
+          P1 --|cookie user_session|--> P2
+          P1 --|cookie user_session|--> P3
+
+          E1 <-->|items кошика| LS
+          P2 <-->|read при оформленні| LS
+
+          P2 --|list/search/stock|--> D2
+          D2 --|product data|--> P2
+
+          P2 --|create order|--> D3
+          D3 --|order + items|--> P2
+
+          P2 --|вітрина / PDF підтвердження|--> E1
+
+          P3 --|CRUD reviews|--> D4
+          D4 --|reviews|--> P3
+
+          P3 --|CRUD products|--> D2
+          D2 --|каталог|--> P3
+
+          P3 --|/admin|--> E2
+          P3 --|схвалені відгуки|--> E1
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4) ER-діаграма (Entity-Relationship)</h2>
+      <div class="mermaid">
+        erDiagram
+          USER {
+            string id PK
+            string email "unique"
+            string passwordHash
+            string name
+            datetime createdAt
+            datetime updatedAt
+          }
+
+          PRODUCT {
+            string id PK
+            string name
+            string slug "unique"
+            string category
+            float price
+            int stockCount
+            bool inStock
+            string imageUrl
+            datetime createdAt
+          }
+
+          SHOP_ORDER {
+            string id PK
+            string customerName
+            string email
+            string phone
+            string address
+            float totalAmount
+            string status
+            datetime createdAt
+            string userId "optional FK"
+          }
+
+          ORDER_LINE {
+            string id PK
+            string orderId FK
+            string productId FK
+            string productName
+            int quantity
+            float price
+          }
+
+          REVIEW {
+            string id PK
+            string productId FK
+            string userId FK
+            int rating
+            string body
+            string status
+            datetime createdAt
+            datetime updatedAt
+          }
+
+          USER ||--o{ SHOP_ORDER : places
+          USER ||--o{ REVIEW : writes
+          SHOP_ORDER ||--o{ ORDER_LINE : contains
+          PRODUCT ||--o{ ORDER_LINE : line_items
+          PRODUCT ||--o{ REVIEW : receives
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.5/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "default",
+      securityLevel: "loose"
+    });
+  </script>
+</body>
+</html>

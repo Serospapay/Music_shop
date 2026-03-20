@@ -28,7 +28,14 @@ export function ProductCard({ product }: ProductCardProps) {
 
         <div className="flex flex-1 flex-col border-t border-white/[0.05] bg-surface-950/50 p-3 sm:p-4">
           <div className="flex items-start justify-between gap-2">
-            <p className="min-w-0 text-[10px] uppercase tracking-[0.18em] text-zinc-500">{product.category}</p>
+            <div className="min-w-0">
+              {product.brand.trim() ? (
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-400/90">
+                  {product.brand.trim()}
+                </p>
+              ) : null}
+              <p className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-zinc-500">{product.category}</p>
+            </div>
             <span
               className={`max-w-[5.5rem] shrink-0 rounded-full px-2 py-0.5 text-center text-[9px] font-medium leading-tight ${
                 product.inStock

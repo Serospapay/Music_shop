@@ -1,0 +1,9 @@
+# One-shot: schema + demo products into Mongo (used by docker-compose service db-seed).
+FROM node:20-bookworm-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+RUN npm ci && npx prisma generate
+CMD ["sh", "-c", "npx prisma db push && npx prisma db seed"]

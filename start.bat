@@ -1,48 +1,60 @@
 @echo off
 setlocal EnableExtensions
-chcp 65001 >nul
 cd /d "%~dp0"
 
+REM Messages in English only: Windows cmd.exe breaks UTF-8/Cyrillic in .bat files.
+
 echo.
-echo === Октава — локальний запуск ===
+echo === Octave: full Docker stack (mongo, catalog-service, order-service, web) ===
 echo.
 
-where node >nul 2>nul
+where docker >nul 2>nul
 if errorlevel 1 (
-  echo [ПОМИЛКА] Node.js не знайдено. Встановіть LTS з https://nodejs.org/
+  echo [ERROR] "docker" not found in PATH. Install Docker Desktop for Windows.
   pause
   exit /b 1
 )
 
-if not exist "node_modules\" (
-  echo [1/3] Встановлення залежностей npm...
-  call npm install
-  if errorlevel 1 (
-    echo [ПОМИЛКА] npm install завершився з помилкою.
-    pause
-    exit /b 1
-  )
-) else (
-  echo [1/3] node_modules вже є — пропускаємо npm install.
-)
-
-echo [2/3] Prisma generate...
-call npx prisma generate
+docker info >nul 2>nul
 if errorlevel 1 (
-  echo.
-  echo [УВАГА] prisma generate завершився з помилкою.
-  echo         На Windows часто EPERM на query_engine — закрийте інші node.exe, dev-сервер або вікно з "npm run dev".
-  echo         Продовжуємо запуск: якщо Prisma-клієнт уже згенерований, dev зазвичай працює.
-  echo         Вручну: npx prisma generate
-  echo.
-) else (
-  echo     Prisma OK.
+  echo [ERROR] Docker Engine is not running. Start Docker Desktop and wait until it is ready.
+  pause
+  exit /b 1
 )
 
-echo [3/3] Запуск Next.js dev-сервера ^(http://localhost:3000^)...
-echo     Зупинка: Ctrl+C
-echo.
-call npm run dev
+if not exist ".env" (
+  echo [WARN] No .env file. Copy .env.example to .env
+  echo.
+)
 
+echo Project directory: %CD%
+echo.
+
+docker compose version >nul 2>&1
+if not errorlevel 1 (
+  echo Using: docker compose - Compose V2
+  echo Open: http://localhost:3000    Stop: Ctrl+C
+  echo Optional after first start: npm run docker:seed
+  echo.
+  docker compose up --build
+  goto after_compose
+)
+
+where docker-compose >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] Neither "docker compose" nor "docker-compose" is available.
+  echo In Docker Desktop: Settings - General - enable "Use Docker Compose V2".
+  pause
+  exit /b 1
+)
+
+echo Using: docker-compose - Compose V1
+echo Open: http://localhost:3000    Stop: Ctrl+C
+echo Optional: npm run docker:seed
+echo.
+docker-compose up --build
+
+:after_compose
 echo.
 pause
+exit /b 0

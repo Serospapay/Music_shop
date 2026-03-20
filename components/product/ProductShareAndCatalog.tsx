@@ -27,11 +27,11 @@ export function ProductShareAndCatalog({ category, absoluteProductUrl }: Product
   const catalogHref = `/catalog?category=${encodeURIComponent(category)}`;
 
   return (
-    <div className="mt-6 flex flex-wrap gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
       <button
         type="button"
         onClick={copy}
-        className="inline-flex items-center gap-2 rounded-xl border border-brand-500/20 bg-surface-950/50 px-4 py-2.5 text-sm font-medium text-zinc-200 transition hover:border-brand-400/40 hover:bg-brand-500/10 hover:text-brand-100"
+        className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-brand-500/20 bg-surface-900/60 px-4 py-2.5 text-sm font-medium text-zinc-200 transition hover:border-brand-400/40 hover:bg-brand-500/10 hover:text-brand-100"
       >
         {copied ? (
           <Check className="h-4 w-4 text-emerald-400" strokeWidth={2} />
@@ -42,7 +42,7 @@ export function ProductShareAndCatalog({ category, absoluteProductUrl }: Product
       </button>
       <Link
         href={catalogHref}
-        className="inline-flex items-center gap-2 rounded-xl border border-brand-500/20 bg-surface-950/50 px-4 py-2.5 text-sm font-medium text-zinc-200 transition hover:border-brand-400/40 hover:bg-brand-500/10 hover:text-brand-100"
+        className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-brand-500/20 bg-surface-900/60 px-4 py-2.5 text-sm font-medium text-zinc-200 transition hover:border-brand-400/40 hover:bg-brand-500/10 hover:text-brand-100"
       >
         <ListMusic className="h-4 w-4" strokeWidth={2} />
         Інше в «{category}»

@@ -7,20 +7,51 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  orders       Order[]
+  reviews      Review[]
+
+  @@index([createdAt(sort: Desc)])
+}
+
 model Product {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  slug        String   @unique
-  description String
-  price       Float
-  category    String
-  imageUrl    String
-  inStock     Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  orderItems  OrderItem[]
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  slug             String   @unique
+  description      String
+  price            Float
+  category         String
+  brand            String   @default("")
+  /// Унікальність у БД не гарантується для старих записів; нові товари отримують унікальний SKU у коді
+  sku              String?
+  highlights       String[] @default([])
+  /// Масив пар { "label", "value" } для таблиці характеристик на PDP (legacy / сумісність)
+  specs            Json?
+  /// Технічні характеристики: [{ "key": "...", "value": "..." }, ...]
+  technicalSpecs   Json     @default("[]")
+  /// Сумісність: масив об'єктів (структура узгоджується з фронтом), напр. [{ "label": "...", "detail": "..." }]
+  compatibility    Json     @default("[]")
+  /// Облік залишку на складі
+  stockCount       Int      @default(0)
+  warrantyMonths   Int      @default(12)
+  imageUrl         String
+  /// Додаткові кадри галереї (основне фото — imageUrl)
+  imageUrls        String[] @default([])
+  inStock          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  orderItems       OrderItem[]
+  reviews          Review[]
 
   @@index([createdAt(sort: Desc)])
   @@index([category])
+  @@index([brand])
+  @@index([sku])
 }
 
 model Order {
@@ -32,10 +63,14 @@ model Order {
   totalAmount  Float
   status       OrderStatus @default(PENDING)
   createdAt    DateTime    @default(now())
+  /// Зв'язок з акаунтом покупця (якщо оформив під час сесії)
+  userId       String?     @db.ObjectId
+  user         User?       @relation(fields: [userId], references: [id])
   items        OrderItem[]
 
   @@index([createdAt(sort: Desc)])
   @@index([email])
+  @@index([userId])
 }
 
 model OrderItem {
@@ -52,10 +87,34 @@ model OrderItem {
   @@index([productId])
 }
 
+model Review {
+  id        String       @id @default(auto()) @map("_id") @db.ObjectId
+  productId String       @db.ObjectId
+  userId    String       @db.ObjectId
+  rating    Int
+  text      String
+  status    ReviewStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@index([userId])
+  @@index([status])
+}
+
 enum OrderStatus {
   PENDING
   PAID
   SHIPPED
   DELIVERED
   CANCELLED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

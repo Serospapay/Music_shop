@@ -4,6 +4,7 @@ import { checkoutPayloadSchema } from "@/lib/validators/checkout";
 import { sendOrderConfirmation } from "@/lib/notifications";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/network";
+import { USER_COOKIE_NAME, verifyUserSessionJwt } from "@/lib/user-session";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,165 @@ type CheckoutResult =
 
 function roundMoney(n: number) {
   return Math.round(n * 100) / 100;
+}
+
+type OrderServiceSuccess = {
+  success: true;
+  orderId: string;
+  totalAmount: number;
+  items: { productId: string; name: string | null; quantity: number; unitPrice: number }[];
+};
+
+async function createOrderViaMicroservice(
+  payload: {
+    customerName: string;
+    email: string;
+    phone: string;
+    address: string;
+    items: { productId: string; quantity: number }[];
+    userId?: string;
+  },
+): Promise<OrderServiceSuccess | { success: false; error: string; status?: number }> {
+  const baseUrl = process.env.ORDER_SERVICE_URL?.replace(/\/$/, "");
+  const token = process.env.SERVICE_INTERNAL_TOKEN?.trim();
+  if (!baseUrl || !token) {
+    return { success: false, error: "Order service not configured" };
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}/orders`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        customerName: payload.customerName,
+        email: payload.email,
+        phone: payload.phone,
+        address: payload.address,
+        items: payload.items,
+        ...(payload.userId ? { userId: payload.userId } : {}),
+      }),
+    });
+  } catch {
+    return {
+      success: false,
+      error: "Сервіс замовлень недоступний. Перевірте, що order-service запущений і ORDER_SERVICE_URL вказує на нього.",
+      status: 503,
+    };
+  }
+
+  let data: OrderServiceSuccess & { success?: boolean; error?: string };
+  try {
+    data = (await res.json()) as typeof data;
+  } catch {
+    return {
+      success: false,
+      error: "Сервіс замовлень повернув некоректну відповідь.",
+      status: 502,
+    };
+  }
+
+  if (!res.ok || !data.success || !data.orderId) {
+    return {
+      success: false,
+      error: data.error ?? "Не вдалося оформити замовлення.",
+      status: res.status,
+    };
+  }
+
+  return data;
+}
+
+async function createOrderViaMonolith(
+  parsedPayload: ReturnType<typeof checkoutPayloadSchema.parse>,
+  orderUserId: string | undefined,
+): Promise<OrderServiceSuccess> {
+  const result = await prisma.$transaction(async (tx) => {
+    const uniqueProductIds = Array.from(new Set(parsedPayload.items.map((item) => item.productId)));
+    const products = await tx.product.findMany({
+      where: {
+        id: { in: uniqueProductIds },
+      },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        inStock: true,
+      },
+    });
+
+    if (products.length !== uniqueProductIds.length) {
+      throw new Error("PRODUCT_NOT_FOUND");
+    }
+
+    const productMap = new Map(products.map((product) => [product.id, product]));
+
+    for (const line of parsedPayload.items) {
+      const product = productMap.get(line.productId);
+      if (!product?.inStock) {
+        throw new Error("OUT_OF_STOCK");
+      }
+    }
+
+    let totalAmount = 0;
+    const orderItems = parsedPayload.items.map((item) => {
+      const product = productMap.get(item.productId);
+      if (!product) {
+        throw new Error("PRODUCT_NOT_FOUND");
+      }
+
+      const unitPrice = roundMoney(Number(product.price));
+      totalAmount = roundMoney(totalAmount + unitPrice * item.quantity);
+
+      return {
+        productId: item.productId,
+        quantity: item.quantity,
+        price: unitPrice,
+        productName: product.name,
+      };
+    });
+
+    const order = await tx.order.create({
+      data: {
+        customerName: parsedPayload.customerName,
+        email: parsedPayload.email,
+        phone: parsedPayload.phone,
+        address: parsedPayload.address,
+        totalAmount,
+        status: "PENDING",
+        userId: orderUserId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    await tx.orderItem.createMany({
+      data: orderItems.map((item) => ({
+        orderId: order.id,
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+    });
+
+    return {
+      orderId: order.id,
+      totalAmount,
+      items: orderItems.map((item) => ({
+        productId: item.productId,
+        name: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.price,
+      })),
+    };
+  });
+
+  return { success: true, ...result };
 }
 
 export async function POST(request: NextRequest) {
@@ -38,88 +198,64 @@ export async function POST(request: NextRequest) {
       return NextResponse.json<CheckoutResult>({ success: false, error: errorMessage }, { status: 400 });
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const uniqueProductIds = Array.from(
-        new Set(parsedPayload.data.items.map((item) => item.productId)),
-      );
-      const products = await tx.product.findMany({
-        where: {
-          id: { in: uniqueProductIds },
-        },
-        select: {
-          id: true,
-          name: true,
-          price: true,
-          inStock: true,
-        },
+    const userToken = request.cookies.get(USER_COOKIE_NAME)?.value;
+    const userSession = await verifyUserSessionJwt(userToken);
+    let orderUserId: string | undefined;
+    if (userSession) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: userSession.userId },
+        select: { id: true, email: true },
       });
-
-      if (products.length !== uniqueProductIds.length) {
-        throw new Error("PRODUCT_NOT_FOUND");
+      if (dbUser && dbUser.email.toLowerCase() === parsedPayload.data.email.trim().toLowerCase()) {
+        orderUserId = dbUser.id;
       }
+    }
 
-      const productMap = new Map(products.map((product) => [product.id, product]));
+    const useMicroservices =
+      Boolean(process.env.ORDER_SERVICE_URL?.trim()) && Boolean(process.env.SERVICE_INTERNAL_TOKEN?.trim());
 
-      for (const line of parsedPayload.data.items) {
-        const product = productMap.get(line.productId);
-        if (!product?.inStock) {
-          throw new Error("OUT_OF_STOCK");
-        }
+    let result: OrderServiceSuccess;
+    if (useMicroservices) {
+      const remote = await createOrderViaMicroservice({
+        customerName: parsedPayload.data.customerName,
+        email: parsedPayload.data.email,
+        phone: parsedPayload.data.phone,
+        address: parsedPayload.data.address,
+        items: parsedPayload.data.items,
+        userId: orderUserId,
+      });
+      if (!remote.success) {
+        const st = remote.status;
+        const status =
+          st === 400 ? 400 : st === 503 ? 503 : st === 502 ? 502 : st && st >= 400 ? st : 500;
+        return NextResponse.json<CheckoutResult>(
+          { success: false, error: remote.error },
+          { status },
+        );
       }
-
-      let totalAmount = 0;
-      const orderItems = parsedPayload.data.items.map((item) => {
-        const product = productMap.get(item.productId);
-        if (!product) {
-          throw new Error("PRODUCT_NOT_FOUND");
+      result = remote;
+    } else {
+      try {
+        result = await createOrderViaMonolith(parsedPayload.data, orderUserId);
+      } catch (error) {
+        if (error instanceof Error && error.message === "PRODUCT_NOT_FOUND") {
+          return NextResponse.json<CheckoutResult>(
+            { success: false, error: "Деякі товари не знайдено. Оновіть кошик." },
+            { status: 400 },
+          );
         }
-
-        const unitPrice = roundMoney(Number(product.price));
-        totalAmount = roundMoney(totalAmount + unitPrice * item.quantity);
-
-        return {
-          productId: item.productId,
-          quantity: item.quantity,
-          price: unitPrice,
-          productName: product.name,
-        };
-      });
-
-      const order = await tx.order.create({
-        data: {
-          customerName: parsedPayload.data.customerName,
-          email: parsedPayload.data.email,
-          phone: parsedPayload.data.phone,
-          address: parsedPayload.data.address,
-          totalAmount,
-          status: "PENDING",
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      await tx.orderItem.createMany({
-        data: orderItems.map((item) => ({
-          orderId: order.id,
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          price: item.price,
-        })),
-      });
-
-      return {
-        orderId: order.id,
-        totalAmount,
-        items: orderItems.map((item) => ({
-          productId: item.productId,
-          name: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.price,
-        })),
-      };
-    });
+        if (error instanceof Error && error.message === "OUT_OF_STOCK") {
+          return NextResponse.json<CheckoutResult>(
+            {
+              success: false,
+              error: "Один або кілька товарів недоступні. Оновіть кошик і спробуйте ще раз.",
+            },
+            { status: 400 },
+          );
+        }
+        throw error;
+      }
+    }
 
     const emailOutcome = await sendOrderConfirmation(parsedPayload.data.email, {
       orderId: result.orderId,
@@ -127,7 +263,12 @@ export async function POST(request: NextRequest) {
       phone: parsedPayload.data.phone,
       address: parsedPayload.data.address,
       totalAmount: result.totalAmount,
-      items: result.items,
+      items: result.items.map((item) => ({
+        productId: item.productId,
+        name: item.name ?? "Товар",
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
     });
 
     if (!emailOutcome.sent) {
@@ -143,23 +284,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json<CheckoutResult>({ success: true, orderId: result.orderId }, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.message === "PRODUCT_NOT_FOUND") {
-      return NextResponse.json<CheckoutResult>(
-        { success: false, error: "Деякі товари не знайдено. Оновіть кошик." },
-        { status: 400 },
-      );
-    }
-
-    if (error instanceof Error && error.message === "OUT_OF_STOCK") {
-      return NextResponse.json<CheckoutResult>(
-        {
-          success: false,
-          error: "Один або кілька товарів недоступні. Оновіть кошик і спробуйте ще раз.",
-        },
-        { status: 400 },
-      );
-    }
-
+    console.error(error);
     return NextResponse.json<CheckoutResult>(
       { success: false, error: "Не вдалося оформити замовлення. Спробуйте ще раз." },
       { status: 500 },

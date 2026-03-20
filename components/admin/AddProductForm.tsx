@@ -30,7 +30,13 @@ export function AddProductForm() {
       description: "",
       price: 0,
       category: "",
+      brand: "",
+      sku: "",
+      highlightsText: "",
+      specsText: "",
+      warrantyMonths: 12,
       imageUrl: "",
+      imageUrlsText: "",
       inStock: true,
     },
     mode: "onBlur",
@@ -123,6 +129,33 @@ export function AddProductForm() {
         </label>
       </div>
 
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <label className="space-y-1.5">
+          <span className="ui-label">Бренд</span>
+          <input
+            type="text"
+            {...register("brand")}
+            disabled={isDisabled}
+            className="ui-input"
+            placeholder="Наприклад: Fender"
+          />
+          {errors.brand ? <p className="text-xs text-rose-400">{errors.brand.message}</p> : null}
+        </label>
+
+        <label className="space-y-1.5">
+          <span className="ui-label">SKU (необов&apos;язково)</span>
+          <input
+            type="text"
+            {...register("sku")}
+            disabled={isDisabled}
+            className="ui-input"
+            placeholder="Наприклад: OCT-MY-001"
+          />
+          {errors.sku ? <p className="text-xs text-rose-400">{errors.sku.message}</p> : null}
+          <p className="text-xs text-zinc-500">Якщо порожньо — згенерується з slug.</p>
+        </label>
+      </div>
+
       <label className="space-y-1.5">
         <span className="ui-label">Опис</span>
         <textarea
@@ -132,6 +165,30 @@ export function AddProductForm() {
           className="ui-input min-h-[6rem] resize-y"
         />
         {errors.description ? <p className="text-xs text-rose-400">{errors.description.message}</p> : null}
+      </label>
+
+      <label className="space-y-1.5">
+        <span className="ui-label">Акценти (по одному рядку)</span>
+        <textarea
+          rows={4}
+          {...register("highlightsText")}
+          disabled={isDisabled}
+          className="ui-input min-h-[5rem] resize-y font-mono text-sm"
+          placeholder={"Короткий пункт 1\nКороткий пункт 2"}
+        />
+        {errors.highlightsText ? <p className="text-xs text-rose-400">{errors.highlightsText.message}</p> : null}
+      </label>
+
+      <label className="space-y-1.5">
+        <span className="ui-label">Характеристики (рядок: «Назва: Значення»)</span>
+        <textarea
+          rows={6}
+          {...register("specsText")}
+          disabled={isDisabled}
+          className="ui-input min-h-[7rem] resize-y font-mono text-sm"
+          placeholder={'Тип: Електрогітара\nКорпус: Ольха\nМензур: 25.5"'}
+        />
+        {errors.specsText ? <p className="text-xs text-rose-400">{errors.specsText.message}</p> : null}
       </label>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -159,19 +216,33 @@ export function AddProductForm() {
           {errors.category ? <p className="text-xs text-rose-400">{errors.category.message}</p> : null}
         </label>
 
-        <label className="flex items-end space-x-2 rounded-xl border border-brand-500/20 bg-surface-900 px-3 py-2.5">
+        <label className="space-y-1.5">
+          <span className="ui-label">Гарантія (міс.)</span>
           <input
-            type="checkbox"
-            {...register("inStock")}
+            type="number"
+            step="1"
+            min="0"
+            max="120"
+            {...register("warrantyMonths", { valueAsNumber: true })}
             disabled={isDisabled}
-            className="h-4 w-4 accent-brand-500"
+            className="ui-input"
           />
-          <span className="text-sm text-zinc-300">В наявності</span>
+          {errors.warrantyMonths ? <p className="text-xs text-rose-400">{errors.warrantyMonths.message}</p> : null}
         </label>
       </div>
 
+      <label className="flex items-end space-x-2 rounded-xl border border-brand-500/20 bg-surface-900 px-3 py-2.5">
+        <input
+          type="checkbox"
+          {...register("inStock")}
+          disabled={isDisabled}
+          className="h-4 w-4 accent-brand-500"
+        />
+        <span className="text-sm text-zinc-300">В наявності</span>
+      </label>
+
       <label className="space-y-1.5">
-        <span className="ui-label">URL зображення</span>
+        <span className="ui-label">URL основного зображення</span>
         <input
           type="url"
           {...register("imageUrl")}
@@ -182,7 +253,19 @@ export function AddProductForm() {
       </label>
 
       <label className="space-y-1.5">
-        <span className="ui-label">Або завантажити файл</span>
+        <span className="ui-label">Додаткові зображення (URL, по одному в рядку)</span>
+        <textarea
+          rows={4}
+          {...register("imageUrlsText")}
+          disabled={isDisabled}
+          className="ui-input min-h-[5rem] resize-y font-mono text-sm"
+          placeholder={"https://…\n/uploads/…"}
+        />
+        {errors.imageUrlsText ? <p className="text-xs text-rose-400">{errors.imageUrlsText.message}</p> : null}
+      </label>
+
+      <label className="space-y-1.5">
+        <span className="ui-label">Або завантажити файл для основного фото</span>
         <input
           type="file"
           accept="image/*"

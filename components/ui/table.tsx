@@ -8,7 +8,7 @@ type TableProps = {
 export function Table({ className = "", children }: TableProps) {
   return (
     <div className={`ui-table-shell ${className}`}>
-      <table className="w-full min-w-[760px] border-collapse">{children}</table>
+      <table className="w-full border-collapse md:min-w-[640px]">{children}</table>
     </div>
   );
 }

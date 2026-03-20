@@ -1,0 +1,123 @@
+# Повний стек у Docker: MongoDB, мікросервіси каталогу/замовлень, Next.js (web).
+# Змінні з .env у корені підставляються у compose (ADMIN_PASSWORD тощо).
+# MONGO_DB_NAME має збігатися з назвою БД у вашому локальному DATABASE_URL (після сиду).
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - octave_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # Після нового тома Mongo каталог порожній — без сиду сайт «пустий». Запускається один раз за старт стеку.
+  db-seed:
+    build:
+      context: .
+      dockerfile: Dockerfile.seed
+    environment:
+      DATABASE_URL: mongodb://mongo:27017/${MONGO_DB_NAME:-octave_shop}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: "no"
+
+  catalog-service:
+    build:
+      context: ./services/catalog-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+    environment:
+      DATABASE_URL: mongodb://mongo:27017/${MONGO_DB_NAME:-octave_shop}
+      PORT: "4001"
+      HOST: 0.0.0.0
+      SERVICE_INTERNAL_TOKEN: ${SERVICE_INTERNAL_TOKEN:-change-me-internal-token}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+    depends_on:
+      mongo:
+        condition: service_healthy
+      db-seed:
+        condition: service_completed_successfully
+
+  order-service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4002:4002"
+    environment:
+      DATABASE_URL: mongodb://mongo:27017/${MONGO_DB_NAME:-octave_shop}
+      CATALOG_SERVICE_URL: http://catalog-service:4001
+      PORT: "4002"
+      HOST: 0.0.0.0
+      SERVICE_INTERNAL_TOKEN: ${SERVICE_INTERNAL_TOKEN:-change-me-internal-token}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+    depends_on:
+      mongo:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: mongodb://mongo:27017/${MONGO_DB_NAME:-octave_shop}
+      ORDER_SERVICE_URL: http://order-service:4002
+      SERVICE_INTERNAL_TOKEN: ${SERVICE_INTERNAL_TOKEN:-change-me-internal-token}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-}
+      USER_SESSION_SECRET: ${USER_SESSION_SECRET:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL:-}
+      UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN:-}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+
+volumes:
+  octave_mongo_data:
