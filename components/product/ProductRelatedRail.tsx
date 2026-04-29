@@ -92,6 +92,7 @@ export function ProductRelatedRail({ products, category }: ProductRelatedRailPro
                   src={p.imageUrl}
                   alt={p.name}
                   fill
+                  unoptimized
                   className="object-cover brightness-[0.92] transition duration-500 group-hover:scale-[1.03] group-hover:brightness-105"
                   sizes="260px"
                 />

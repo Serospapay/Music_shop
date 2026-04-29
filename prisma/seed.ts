@@ -1,4 +1,5 @@
-import { MongoClient } from "mongodb";
+import { hashSync } from "bcryptjs";
+import { MongoClient, ObjectId } from "mongodb";
 
 type SpecRow = { label: string; value: string };
 
@@ -22,6 +23,23 @@ type SeedProduct = {
   inStock: boolean;
 };
 
+type SeedUser = {
+  name: string;
+  email: string;
+  password: string;
+};
+
+type SeedReviewSnippet = {
+  rating: 4 | 5;
+  text: string;
+};
+
+const AUTHORIZED_DEMO_USER: SeedUser = {
+  name: "авторизований користувач",
+  email: "authorized.user@octava.demo",
+  password: "AuthorizedUser#2026",
+};
+
 function specsToTechnical(specs: SpecRow[]): { key: string; value: string }[] {
   return specs.map((s) => ({ key: s.label, value: s.value }));
 }
@@ -37,9 +55,8 @@ function stockCountFor(p: SeedProduct): number {
   return 8 + (h % 42);
 }
 
-/** Параметри як у next/image — перевірені HEAD-запитами (Unsplash інколи прибирає старі photo-id). */
-const unsplash = (photoId: string) =>
-  `https://images.unsplash.com/photo-${photoId}?auto=format&fit=crop&w=1200&q=80`;
+/** Стабільні посилання на конкретні фото Unsplash (через download endpoint). */
+const unsplash = (photoId: string) => `https://unsplash.com/photos/${photoId}/download?force=true&w=1200`;
 
 const products: SeedProduct[] = [
   {
@@ -66,8 +83,8 @@ const products: SeedProduct[] = [
       { label: "Фурнітура", value: "Хром, 2-point tremolo" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1564186763535-ebb21ef5277f"),
-    imageUrls: [unsplash("1516920610607-560e6f89e4a0")],
+    imageUrl: unsplash("SUR4TbJHTrE"),
+    imageUrls: [unsplash("BPnRGuELLe4")],
     inStock: true,
   },
   {
@@ -94,8 +111,8 @@ const products: SeedProduct[] = [
       { label: "Брідж", value: "Tune-O-Matic + Stopbar" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1510915361894-db8b60106cb1"),
-    imageUrls: [unsplash("1550985612-1084d8829469")],
+    imageUrl: unsplash("lm2Sa4Em7oo"),
+    imageUrls: [unsplash("phkp6WdpnIc")],
     inStock: true,
   },
   {
@@ -122,8 +139,8 @@ const products: SeedProduct[] = [
       { label: "Кейс", value: "Жорсткий / полужорсткий (залежно від партії)" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1516280440614-37939bbacd81"),
-    imageUrls: [unsplash("1525201548942-d6192d17e2c0")],
+    imageUrl: unsplash("8RVAHTAuC04"),
+    imageUrls: [unsplash("5Xdk4gW5e1Q")],
     inStock: true,
   },
   {
@@ -150,8 +167,8 @@ const products: SeedProduct[] = [
       { label: "Звукознімачі", value: "HSH V7/S1/V8" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1493225457124-a3eb161ffa5f"),
-    imageUrls: [unsplash("1516920610607-560e6f89e4a0")],
+    imageUrl: unsplash("6pZwlZ0ff6s"),
+    imageUrls: [unsplash("lm2Sa4Em7oo")],
     inStock: true,
   },
   {
@@ -178,8 +195,8 @@ const products: SeedProduct[] = [
       { label: "Брідж", value: "Струнодержатель Music Man" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1511671782779-c97d3d27a1d4"),
-    imageUrls: [unsplash("1508700115892-45ecd05ae2ad")],
+    imageUrl: unsplash("JI5HQV-78RY"),
+    imageUrls: [unsplash("CGQ0IBUVzrc")],
     inStock: true,
   },
   {
@@ -206,8 +223,8 @@ const products: SeedProduct[] = [
       { label: "Брідж", value: "4-седловий стандарт Fender" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1508700115892-45ecd05ae2ad"),
-    imageUrls: [unsplash("1511671782779-c97d3d27a1d4")],
+    imageUrl: unsplash("dvTUtUnJkoI"),
+    imageUrls: [unsplash("PuhOlQw32ho")],
     inStock: true,
   },
   {
@@ -234,8 +251,8 @@ const products: SeedProduct[] = [
       { label: "Живлення", value: "Мережевий адаптер (у комплекті)" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1520523839897-bd0b52f945a0"),
-    imageUrls: [unsplash("1571327073757-71d13c24de30")],
+    imageUrl: unsplash("Ly7MLdjJXQc"),
+    imageUrls: [unsplash("4W7HePnz7yg")],
     inStock: true,
   },
   {
@@ -262,8 +279,8 @@ const products: SeedProduct[] = [
       { label: "Живлення", value: "Зовнішній адаптер (у комплекті)" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1571327073757-71d13c24de30"),
-    imageUrls: [unsplash("1520523839897-bd0b52f945a0")],
+    imageUrl: unsplash("5XzAEopFO24"),
+    imageUrls: [unsplash("CpCgOckQhRg")],
     inStock: true,
   },
   {
@@ -290,8 +307,8 @@ const products: SeedProduct[] = [
       { label: "Живлення", value: "Адаптер (у комплекті)" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1598488035139-bdbb2231ce04"),
-    imageUrls: [unsplash("1571327073757-71d13c24de30")],
+    imageUrl: unsplash("NyjJoANsqVw"),
+    imageUrls: [unsplash("CpCgOckQhRg")],
     inStock: false,
   },
   {
@@ -318,8 +335,8 @@ const products: SeedProduct[] = [
       { label: "Комплектація", value: "Раки, кріплення (уточнюйте)" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1514525253161-7a46d19cd819"),
-    imageUrls: [unsplash("1485579149621-3123dd979885")],
+    imageUrl: unsplash("KZucO9pcOfM"),
+    imageUrls: [unsplash("sU4MnpXKyBQ")],
     inStock: true,
   },
   {
@@ -346,8 +363,8 @@ const products: SeedProduct[] = [
       { label: "Чохол", value: "Опційно / залежить від партії" },
     ],
     warrantyMonths: 12,
-    imageUrl: unsplash("1485579149621-3123dd979885"),
-    imageUrls: [unsplash("1514525253161-7a46d19cd819")],
+    imageUrl: unsplash("sU4MnpXKyBQ"),
+    imageUrls: [unsplash("shQesl7x3RA")],
     inStock: true,
   },
   {
@@ -374,8 +391,8 @@ const products: SeedProduct[] = [
       { label: "Підключення", value: "XLR" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1590602847861-f357a9332bbc"),
-    imageUrls: [unsplash("1598653222000-6b7b7a552625")],
+    imageUrl: unsplash("PMN6wntEQtQ"),
+    imageUrls: [unsplash("PMN6wntEQtQ")],
     inStock: true,
   },
   {
@@ -402,8 +419,8 @@ const products: SeedProduct[] = [
       { label: "Сумісність", value: "macOS / Windows" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1598653222000-6b7b7a552625"),
-    imageUrls: [unsplash("1590602847861-f357a9332bbc")],
+    imageUrl: unsplash("JMVDrEfp9Q0"),
+    imageUrls: [unsplash("JMVDrEfp9Q0")],
     inStock: true,
   },
   {
@@ -440,8 +457,8 @@ const products: SeedProduct[] = [
       },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1505740420928-5e560c06d30e"),
-    imageUrls: [unsplash("1558618666-fcd25c85cd64")],
+    imageUrl: unsplash("wUcXPyX56Ug"),
+    imageUrls: [unsplash("Hkf0gLvVl4M")],
     inStock: true,
   },
   {
@@ -468,8 +485,8 @@ const products: SeedProduct[] = [
       { label: "Живлення", value: "Мережа 220 В" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1558618666-fcd25c85cd64"),
-    imageUrls: [unsplash("1505740420928-5e560c06d30e")],
+    imageUrl: unsplash("PPE12KFotNs"),
+    imageUrls: [unsplash("yoBDElFsC0k")],
     inStock: true,
   },
   {
@@ -496,8 +513,8 @@ const products: SeedProduct[] = [
       { label: "Ключі", value: "До високого F# (залежно від партії)" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1470225620780-dba8ba36b745"),
-    imageUrls: [unsplash("1524368535928-5b5e00ddc76b")],
+    imageUrl: unsplash("dBWvUqBoOU8"),
+    imageUrls: [unsplash("mI1FkOY_r30")],
     inStock: true,
   },
   {
@@ -524,8 +541,8 @@ const products: SeedProduct[] = [
       { label: "Футляр", value: "Жорсткий кейс" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1524368535928-5b5e00ddc76b"),
-    imageUrls: [unsplash("1470225620780-dba8ba36b745")],
+    imageUrl: unsplash("y16CTzl1i6g"),
+    imageUrls: [unsplash("E8vKoGHANlQ")],
     inStock: true,
   },
   {
@@ -552,11 +569,83 @@ const products: SeedProduct[] = [
       { label: "Брідж", value: "Палісандру, кістяні шпильки" },
     ],
     warrantyMonths: 24,
-    imageUrl: unsplash("1511379938547-c1f69419868d"),
-    imageUrls: [unsplash("1516280440614-37939bbacd81")],
+    imageUrl: unsplash("ZIbrlLp63PY"),
+    imageUrls: [unsplash("ZIbrlLp63PY")],
     inStock: true,
   },
 ];
+
+const reviewUsers: SeedUser[] = [
+  AUTHORIZED_DEMO_USER,
+  { name: "Олег Кравченко", email: "oleh.kravchenko.reviews@gmail.com", password: "ReviewUser#2026" },
+  { name: "Ірина Савченко", email: "iryna.savchenko.reviews@gmail.com", password: "ReviewUser#2026" },
+  { name: "Максим Мазур", email: "maksym.mazur.reviews@gmail.com", password: "ReviewUser#2026" },
+  { name: "Софія Ткаченко", email: "sofia.tkachenko.reviews@gmail.com", password: "ReviewUser#2026" },
+  { name: "Андрій Романюк", email: "andrii.romaniuk.reviews@gmail.com", password: "ReviewUser#2026" },
+  { name: "Наталія Петренко", email: "nataliia.petrenko.reviews@gmail.com", password: "ReviewUser#2026" },
+  { name: "Денис Гнатюк", email: "denys.hnatiuk.reviews@gmail.com", password: "ReviewUser#2026" },
+  { name: "Марія Бондар", email: "mariia.bondar.reviews@gmail.com", password: "ReviewUser#2026" },
+];
+
+const reviewSnippetsByCategory: Record<string, SeedReviewSnippet[]> = {
+  "Гітари": [
+    { rating: 5, text: "Після двох репетицій інструмент тримає стрій стабільно, сустейн довгий. По грифу рука йде легко." },
+    { rating: 5, text: "Брав для запису ритм-партій — атака чітка, шумів майже немає. Збірка акуратна, без люфтів." },
+    { rating: 4, text: "З коробки все ок, лише трохи підкрутив висоту струн під себе. Для сцени і студії підходить." },
+    { rating: 5, text: "Дуже збалансоване звучання між чистим і перевантаженим каналом. В живому міксі не губиться." },
+  ],
+  "Бас-гітари": [
+    { rating: 5, text: "Низ щільний і контрольований, на репетиції в міксі читається без зайвого буста еквалайзером." },
+    { rating: 4, text: "Гриф зручний, мензура комфортна. Після базового налаштування інтонація по ладах рівна." },
+    { rating: 5, text: "Для фанку і поп-року дуже влучний характер, слеп звучить виразно без перевантаження верхів." },
+  ],
+  "Клавішні": [
+    { rating: 5, text: "Клавіші приємні по відчуттю, динаміка добре передається. Для домашніх занять і виступів — супер." },
+    { rating: 4, text: "Сетап зайняв 10 хвилин, усе інтуїтивно. З педаллю і навушниками працює без нарікань." },
+    { rating: 5, text: "Тембри ідеально сідають в аранжування, перемикання пресетів швидке навіть під час лайву." },
+  ],
+  "Ударні": [
+    { rating: 5, text: "Набір звучить щільно, томи відкриваються після першого ж налаштування. Для концертів саме те." },
+    { rating: 4, text: "Фурнітура міцна, стійки тримають стабільно. На репетиційній базі витримав активну експлуатацію." },
+    { rating: 5, text: "Тарілки добре читаються в мікрофонах, атака ясна, без зайвого «піску» у верхньому діапазоні." },
+  ],
+  "Студія": [
+    { rating: 5, text: "Для вокалу і мови результат чистий, рівень шуму низький. У робочому проєкті показав себе відмінно." },
+    { rating: 4, text: "Інтерфейс піднявся без проблем, затримка комфортна. Моніторинг стабільний, без артефактів." },
+    { rating: 5, text: "Робочий інструмент на кожен день: підключив і працює. Якість матеріалів відчутно вища за бюджетний сегмент." },
+  ],
+  "Аксесуари": [
+    { rating: 5, text: "Щоденне використання без дискомфорту, матеріали приємні. За ці гроші дуже вдалий варіант." },
+    { rating: 4, text: "Після кількох сесій все працює стабільно, без несподіваних нюансів. Легко інтегрується в сетап." },
+    { rating: 5, text: "Практичний і надійний аксесуар, який реально спрощує роботу на репетиціях і в студії." },
+  ],
+  "Духові": [
+    { rating: 5, text: "Інтонація рівна по всьому діапазону, атака прогнозована. Добре поводиться і в оркестрі, і соло." },
+    { rating: 4, text: "Механіка плавна, клапани працюють тихо. Для тривалих занять інструмент комфортний." },
+    { rating: 5, text: "Тембр насичений, контроль динаміки зручний. Після прогріву звук стає ще глибшим." },
+  ],
+};
+
+function hashSeed(input: string): number {
+  let h = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    h = (h * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+function pickDistinctIndexes(total: number, start: number, count: number): number[] {
+  const result: number[] = [];
+  let cursor = start;
+  while (result.length < count && result.length < total) {
+    const index = cursor % total;
+    if (!result.includes(index)) {
+      result.push(index);
+    }
+    cursor += 3;
+  }
+  return result;
+}
 
 function databaseNameFromUrl(url: string) {
   try {
@@ -582,11 +671,16 @@ async function main() {
   await client.connect();
 
   const db = client.db(databaseNameFromUrl(url));
-  const collection = db.collection("Product");
+  const productCollection = db.collection("Product");
+  const userCollection = db.collection("User");
+  const reviewCollection = db.collection("Review");
+  const orderCollection = db.collection("Order");
+  const orderItemCollection = db.collection("OrderItem");
+  const wishlistCollection = db.collection("WishlistItem");
   const now = new Date();
 
   for (const p of products) {
-    await collection.updateOne(
+    await productCollection.updateOne(
       { slug: p.slug },
       {
         $set: {
@@ -613,8 +707,130 @@ async function main() {
     );
   }
 
+  for (const seedUser of reviewUsers) {
+    await userCollection.updateOne(
+      { email: seedUser.email.toLowerCase() },
+      {
+        $set: {
+          name: seedUser.name,
+          email: seedUser.email.toLowerCase(),
+          passwordHash: hashSync(seedUser.password, 10),
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          createdAt: now,
+        },
+      },
+      { upsert: true },
+    );
+  }
+
+  const dbUsers = (await userCollection
+    .find(
+      { email: { $in: reviewUsers.map((u) => u.email.toLowerCase()) } },
+      { projection: { _id: 1, email: 1 } },
+    )
+    .toArray()) as Array<{ _id: ObjectId; email: string }>;
+  const usersByEmail = new Map(dbUsers.map((u) => [u.email.toLowerCase(), u._id]));
+
+  const dbProducts = (await productCollection
+    .find(
+      { slug: { $in: products.map((p) => p.slug) } },
+      { projection: { _id: 1, slug: 1, name: 1, category: 1, price: 1 } },
+    )
+    .toArray()) as Array<{ _id: ObjectId; slug: string; name: string; category: string; price: number }>;
+
+  const authorizedUserId = usersByEmail.get(AUTHORIZED_DEMO_USER.email.toLowerCase());
+  if (authorizedUserId && dbProducts.length > 0) {
+    const orderSeedTag = "authorized-demo-order-v1";
+    const existingDemoOrders = (await orderCollection
+      .find({ seedTag: orderSeedTag }, { projection: { _id: 1 } })
+      .toArray()) as Array<{ _id: ObjectId }>;
+    if (existingDemoOrders.length > 0) {
+      await orderItemCollection.deleteMany({ orderId: { $in: existingDemoOrders.map((o) => o._id) } });
+      await orderCollection.deleteMany({ _id: { $in: existingDemoOrders.map((o) => o._id) } });
+    }
+
+    const totalAmount = dbProducts.reduce((sum, product) => sum + Number(product.price), 0);
+    const insertedOrder = await orderCollection.insertOne({
+      seedTag: orderSeedTag,
+      customerName: AUTHORIZED_DEMO_USER.name,
+      email: AUTHORIZED_DEMO_USER.email.toLowerCase(),
+      phone: "+380501112233",
+      address: "м. Київ, вул. Хрещатик, 22",
+      totalAmount,
+      status: "PAID",
+      userId: authorizedUserId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    if (dbProducts.length > 0) {
+      await orderItemCollection.insertMany(
+        dbProducts.map((product) => ({
+          orderId: insertedOrder.insertedId,
+          productId: product._id,
+          productName: product.name,
+          quantity: 1,
+          price: Number(product.price),
+        })),
+      );
+    }
+
+    await wishlistCollection.deleteMany({ userId: authorizedUserId });
+    await wishlistCollection.insertMany(
+      dbProducts.slice(0, 8).map((product, index) => ({
+        userId: authorizedUserId,
+        productId: product._id,
+        createdAt: new Date(now.getTime() - index * 60 * 60 * 1000),
+      })),
+    );
+  }
+
+  let seededReviews = 0;
+  for (const product of dbProducts) {
+    const snippets = reviewSnippetsByCategory[product.category] ?? reviewSnippetsByCategory["Аксесуари"];
+    const baseSeed = hashSeed(product.slug);
+    const userIndexes = pickDistinctIndexes(reviewUsers.length, baseSeed, 3);
+
+    for (let i = 0; i < userIndexes.length; i += 1) {
+      const user = reviewUsers[userIndexes[i]];
+      const userId = usersByEmail.get(user.email.toLowerCase());
+      if (!userId) {
+        continue;
+      }
+      const snippet = snippets[(baseSeed + i) % snippets.length];
+      const createdAt = new Date(now.getTime() - (5 + ((baseSeed + i * 11) % 160)) * 24 * 60 * 60 * 1000);
+      const reviewText = `Користуюсь ${product.name} вже кілька тижнів. ${snippet.text}`;
+
+      await reviewCollection.updateOne(
+        { productId: product._id, userId },
+        {
+          $set: {
+            productId: product._id,
+            userId,
+            rating: snippet.rating,
+            text: reviewText,
+            status: "APPROVED",
+            updatedAt: now,
+          },
+          $setOnInsert: {
+            createdAt,
+          },
+        },
+        { upsert: true },
+      );
+      seededReviews += 1;
+    }
+  }
+
   await client.close();
-  console.log(`Готово: ${products.length} товарів у колекції Product (Mongo upsert за slug).`);
+  console.log(
+    `Готово: ${products.length} товарів, ${reviewUsers.length} акаунтів і ${seededReviews} живих відгуків у MongoDB.`,
+  );
+  console.log(
+    `Демо-акаунт: ${AUTHORIZED_DEMO_USER.email} / ${AUTHORIZED_DEMO_USER.password} (ім'я: ${AUTHORIZED_DEMO_USER.name})`,
+  );
 }
 
 main().catch((e) => {

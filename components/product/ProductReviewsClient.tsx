@@ -16,6 +16,7 @@ type PublicReview = {
   text: string;
   createdAt: string;
   authorName: string;
+  verifiedPurchase: boolean;
 };
 
 type MyReview = {
@@ -31,6 +32,11 @@ type ProductReviewsClientProps = {
   currentUser: SessionUser | null;
   initialApproved: PublicReview[];
   myReview: MyReview | null;
+  stats: {
+    averageRating: number;
+    totalApproved: number;
+    distribution: Array<{ stars: number; count: number }>;
+  };
 };
 
 export function ProductReviewsClient({
@@ -39,6 +45,7 @@ export function ProductReviewsClient({
   currentUser,
   initialApproved,
   myReview,
+  stats,
 }: ProductReviewsClientProps) {
   const router = useRouter();
   const [rating, setRating] = useState(myReview?.rating ?? 5);
@@ -157,6 +164,36 @@ export function ProductReviewsClient({
       )}
 
       <div className="mt-10 space-y-6">
+        {stats.totalApproved > 0 ? (
+          <div className="rounded-2xl border border-brand-500/12 bg-surface-900/35 p-5 sm:p-6">
+            <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">Середня оцінка</p>
+                <p className="mt-2 flex items-end gap-2">
+                  <span className="font-display text-4xl text-white">{stats.averageRating.toFixed(1)}</span>
+                  <span className="pb-1 text-sm text-zinc-400">з 5</span>
+                </p>
+                <p className="mt-1 text-sm text-zinc-400">{stats.totalApproved} підтверджених публікацій</p>
+              </div>
+              <div className="w-full max-w-md space-y-2">
+                {stats.distribution.map((row) => {
+                  return (
+                    <div key={row.stars} className="grid grid-cols-[3rem,1fr,2.5rem] items-center gap-2">
+                      <span className="text-xs text-zinc-400">{row.stars}★</span>
+                      <progress
+                        value={row.count}
+                        max={Math.max(1, stats.totalApproved)}
+                        className="h-2 w-full overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-surface-800 [&::-webkit-progress-value]:bg-brand-400/80 [&::-moz-progress-bar]:bg-brand-400/80"
+                      />
+                      <span className="text-right text-xs text-zinc-500">{row.count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {initialApproved.length === 0 ? (
           <p className="text-sm text-zinc-500">Ще немає схвалених відгуків.</p>
         ) : (
@@ -166,7 +203,14 @@ export function ProductReviewsClient({
               className="rounded-2xl border border-brand-500/10 bg-surface-900/30 p-5 sm:p-6"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-medium text-white">{r.authorName}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-white">{r.authorName}</p>
+                  {r.verifiedPurchase ? (
+                    <span className="rounded-full border border-emerald-500/35 bg-emerald-500/12 px-2 py-0.5 text-[11px] font-medium text-emerald-200">
+                      Підтверджена покупка
+                    </span>
+                  ) : null}
+                </div>
                 <time className="text-xs text-zinc-500" dateTime={r.createdAt}>
                   {new Date(r.createdAt).toLocaleDateString("uk-UA", {
                     year: "numeric",

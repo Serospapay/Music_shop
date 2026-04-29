@@ -126,6 +126,7 @@ export function CartSheet({ triggerClassName, badgeClassName }: CartSheetProps =
                                   src={item.imageUrl}
                                   alt=""
                                   fill
+                                  unoptimized
                                   className="object-cover"
                                   sizes="(max-width: 640px) 88px, 104px"
                                 />
@@ -227,7 +228,7 @@ export function CartSheet({ triggerClassName, badgeClassName }: CartSheetProps =
       <button
         type="button"
         aria-label="Відкрити кошик"
-        aria-expanded={isOpen ? true : false}
+        aria-expanded={isOpen}
         onClick={() => setIsOpen(true)}
         className={cn(
           "relative rounded-full border border-brand-500/25 p-2.5 text-zinc-200 shadow-lg transition-all duration-300 hover:scale-105 hover:border-brand-400/45 hover:text-brand-100",

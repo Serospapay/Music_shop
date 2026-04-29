@@ -13,8 +13,8 @@ export default function CheckoutSuccessPage({ searchParams }: CheckoutSuccessPag
         <p className="ui-page-eyebrow">Готово</p>
         <h1 className="mt-3 font-display text-3xl font-normal text-white sm:text-4xl">Дякуємо за замовлення!</h1>
         <p className="ui-body mt-3">
-          Ваше замовлення прийнято в обробку. Найближчим часом менеджер зв&apos;яжеться з вами для підтвердження
-          деталей доставки.
+          Ваше замовлення успішно створене і передане адміністратору в чергу обробки. Найближчим часом менеджер
+          зв&apos;яжеться з вами для підтвердження деталей доставки.
         </p>
         {orderId ? (
           <p className="ui-surface-inset mt-6 px-4 py-3 text-sm text-zinc-200">

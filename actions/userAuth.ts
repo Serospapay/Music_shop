@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 import { loginSchema, registerSchema } from "@/lib/validators/auth";
+import { shouldUseSecureCookie } from "@/lib/cookie-secure";
 import { USER_COOKIE_NAME, createUserSessionJwt } from "@/lib/user-session";
 
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
@@ -17,7 +18,7 @@ async function setUserCookieAsync(token: string) {
     value: token,
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(),
     path: "/",
     maxAge: COOKIE_MAX_AGE,
   });

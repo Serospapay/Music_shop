@@ -14,6 +14,11 @@ model Order {
   email        String
   phone        String
   address      String
+  deliveryMethod DeliveryMethod?
+  paymentMethod PaymentMethod?
+  deliveryFee   Float?
+  customerComment String?
+  adminQueuedAt DateTime?
   totalAmount  Float
   status       OrderStatus @default(PENDING)
   createdAt    DateTime    @default(now())
@@ -40,4 +45,17 @@ enum OrderStatus {
   SHIPPED
   DELIVERED
   CANCELLED
+}
+
+enum DeliveryMethod {
+  NOVA_POSHTA_WAREHOUSE
+  NOVA_POSHTA_COURIER
+  UKRPOSHTA
+  STORE_PICKUP
+}
+
+enum PaymentMethod {
+  CASH_ON_DELIVERY
+  ONLINE_CARD
+  BANK_TRANSFER
 }

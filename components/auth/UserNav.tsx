@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut, UserRound } from "lucide-react";
+import { Heart, LogOut, UserRound } from "lucide-react";
 import { logoutUserAction } from "@/actions/userAuth";
 import type { SessionUser } from "@/lib/user-auth";
 
@@ -29,6 +29,14 @@ export function UserNav({ user }: UserNavProps) {
 
   return (
     <div className="hidden items-center gap-2 sm:flex sm:gap-3">
+      <Link
+        href="/account#wishlist"
+        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium text-zinc-500 transition-colors hover:text-brand-200"
+        aria-label="Відкрити список бажань"
+      >
+        <Heart className="h-4 w-4" strokeWidth={1.75} />
+        <span className="hidden lg:inline">Бажане</span>
+      </Link>
       <Link
         href="/account"
         className="inline-flex max-w-[10rem] items-center gap-2 truncate rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-white"

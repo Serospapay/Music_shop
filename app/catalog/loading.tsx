@@ -34,6 +34,23 @@ export default function CatalogLoading() {
           ))}
         </section>
       </div>
+
+      <section className="mt-12 border-t border-brand-500/10 pt-9">
+        <div className="h-8 w-72 animate-pulse rounded bg-surface-800" />
+        <div className="mt-2 h-4 w-full max-w-lg animate-pulse rounded bg-surface-800" />
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={`personalized-skeleton-${index}`} className="ui-frame overflow-hidden">
+              <div className="aspect-[4/3] animate-pulse bg-surface-800" />
+              <div className="space-y-3 p-4">
+                <div className="h-3 w-24 animate-pulse rounded bg-surface-800" />
+                <div className="h-4 w-full animate-pulse rounded bg-surface-800" />
+                <div className="h-4 w-2/3 animate-pulse rounded bg-surface-800" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

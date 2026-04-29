@@ -11,9 +11,9 @@
 - **Сторінка товару:** інтерактивний герой (нахил під курсором, лайтбокс), липка панель на десктопі, розгортання опису, копіювання посилання, схожі товари з тієї ж категорії, мобільний sticky CTA.
 - **Кошик:** Zustand + `localStorage`, бічна панель у хедері.
 - **Оформлення:** форма з валідацією (Zod + RHF), API `POST /api/checkout`, запис замовлення в БД, опційний лист через **Resend**.
-- **Покупець:** реєстрація та вхід (`/register`, `/login`), пароль **bcrypt**, JWT у cookie `user_session` (`USER_SESSION_SECRET` або fallback на адмін-секрет). Кабінет `/account` — історія замовлень (якщо email у формі збігався з акаунтом). Відгуки на товарі — з модерацією (`PENDING` → схвалити/відхилити в `/admin/reviews`).
+- **Покупець:** реєстрація та вхід (`/register`, `/login`), пароль **bcrypt**, JWT у cookie `user_session` (`USER_SESSION_SECRET` або fallback на адмін-секрет; якщо їх немає — вбудований демо-ключ, не для публічного продакшену). Кабінет `/account` — історія замовлень (якщо email у формі збігався з акаунтом). Відгуки на товарі — з модерацією (`PENDING` → схвалити/відхилити в `/admin/reviews`).
 - **Мікросервіси (для оформлення замовлення):** окремі Node-сервіси **catalog-service** (перевірка товарів/цін) та **order-service** (створення замовлення), з’єднані HTTP; Next.js виступає як **BFF**. Увімкнення: задати `ORDER_SERVICE_URL` + `SERVICE_INTERNAL_TOKEN` (див. `docs/MICROSERVICES.md`, `docker-compose.yml`). Без змінних checkout працює через **монолітний** Prisma у тому ж Next (зручно для локальної розробки).
-- **Адмінка:** `/admin` — JWT-сесія в cookie (`jose`), пароль з `ADMIN_PASSWORD`; товари (CRUD через server actions), перегляд замовлень, модерація відгуків.
+- **Адмінка:** `/admin` — JWT у cookie (`jose`); вхід на `/admin/login` **без пароля** (демо). Опційно `ADMIN_SESSION_SECRET` або `ADMIN_PASSWORD` змінюють матеріал підпису JWT; інакше використовується вбудований демо-ключ (не для публічного продакшену). Товари (CRUD), замовлення, модерація відгуків.
 - **Обмеження запитів:** in-memory або **Upstash Redis** для rate limit на чутливих маршрутах.
 - **Завантаження зображень:** `POST /api/upload` для адмінки (збереження в `public`).
 
@@ -67,10 +67,9 @@ copy .env.example .env
 | Змінна | Опис |
 |--------|------|
 | `DATABASE_URL` | Рядок підключення MongoDB, напр. `mongodb://127.0.0.1:27017/octave_shop`. **Назва БД в URI** — це та сама база, куди потрапляють `prisma db push` і `npm run db:seed`; якщо змінити лише назву в `.env`, а seed робили в іншу БД, на сайті буде порожній каталог. |
-| `ADMIN_PASSWORD` | Пароль входу в `/admin` |
-| `NEXT_PUBLIC_SITE_URL` | Базовий URL сайту (для metadata, Open Graph, копіювання посилання на товар) |
+| `NEXT_PUBLIC_SITE_URL` | Базовий URL сайту (для metadata, Open Graph, копіювання посилання на товар, коректні **Secure**-cookies на HTTPS) |
 
-Решта — опційно: `ADMIN_SESSION_SECRET`, `USER_SESSION_SECRET` (JWT для покупців; інакше використовується адмін-секрет), **`SERVICE_INTERNAL_TOKEN`** + **`ORDER_SERVICE_URL`** (мікросервіси замовлень), `RESEND_*`, `UPSTASH_*`, `NEXT_IMAGE_REMOTE_HOSTS`. Деталі в `.env.example` та `docs/MICROSERVICES.md`.
+Опційно: `ADMIN_SESSION_SECRET` / `ADMIN_PASSWORD` (матеріал підпису JWT адмін-сесії; без них — демо-ключ у коді), `USER_SESSION_SECRET` (JWT покупців), **`SERVICE_INTERNAL_TOKEN`** + **`ORDER_SERVICE_URL`** (мікросервіси), `RESEND_*`, `UPSTASH_*`, `NEXT_IMAGE_REMOTE_HOSTS`. Деталі в `.env.example` та `docs/MICROSERVICES.md`.
 
 ### 3. Схема БД
 
@@ -126,10 +125,9 @@ npm run dev
 
 ## Адмін-панель
 
-- URL: **`/admin`**, вхід: **`/admin/login`**
+- URL: **`/admin`**, вхід: **`/admin/login`** (одна кнопка, без пароля).
 - Захист: `middleware.ts` перевіряє cookie `admin_session` (JWT).
-- Якщо змінювали issuer/секрет JWT у коді — потрібен повторний вхід.
-- Без `ADMIN_PASSWORD` у `.env` адмін-маршрути перенаправляють на логін з помилкою конфігурації.
+- Якщо змінити `ADMIN_SESSION_SECRET` / `ADMIN_PASSWORD` у `.env` — старі сесії стануть недійсними; увійдіть знову.
 
 ---
 
@@ -164,7 +162,7 @@ npm run build
 npm run start
 ```
 
-Переконайтеся, що в середовищі задані `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL`, `ADMIN_PASSWORD` (і за потреби секрети Resend/Upstash).
+Переконайтеся, що задані `DATABASE_URL`, `NEXT_PUBLIC_SITE_URL` (і за потреби Resend/Upstash).
 
 На **Windows** якщо `prisma generate` падає з **EPERM**, закрийте інші процеси `node.exe` / IDE, що тримають `query_engine-*.dll`, і повторіть `npx prisma generate`.
 

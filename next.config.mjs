@@ -15,6 +15,8 @@ function parseImageRemoteHosts() {
 const nextConfig = {
   output: "standalone",
   images: {
+    // Keep external image URLs fully flexible for admin-provided product links.
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
@@ -29,6 +31,11 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "picsum.photos",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "media.wired.com",
         pathname: "/**",
       },
       ...parseImageRemoteHosts(),

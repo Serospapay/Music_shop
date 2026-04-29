@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/user-auth";
 import { formatPriceUah } from "@/lib/format";
+import { WishlistSection } from "@/components/account/WishlistSection";
 
 export const metadata: Metadata = {
   title: "Мій кабінет",
@@ -24,15 +25,34 @@ export default async function AccountPage() {
     redirect("/login?next=/account");
   }
 
-  const orders = await prisma.order.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    include: {
-      items: {
-        orderBy: { id: "asc" },
+  const [orders, wishlistItems] = await Promise.all([
+    prisma.order.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      include: {
+        items: {
+          orderBy: { id: "asc" },
+        },
       },
-    },
-  });
+    }),
+    prisma.wishlistItem.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            imageUrl: true,
+            category: true,
+            price: true,
+            inStock: true,
+          },
+        },
+      },
+    }),
+  ]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
@@ -93,6 +113,25 @@ export default async function AccountPage() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section id="wishlist" className="ui-surface mt-6 p-6 sm:p-8">
+        <h2 className="font-display text-xl font-semibold text-white">Список бажань</h2>
+        <p className="mt-2 text-sm text-zinc-500">
+          Збережені товари для швидкого повернення до покупки після авторизації.
+        </p>
+        <WishlistSection
+          initialItems={wishlistItems.map((row) => ({
+            productId: row.product.id,
+            productName: row.product.name,
+            slug: row.product.slug,
+            imageUrl: row.product.imageUrl,
+            category: row.product.category,
+            price: row.product.price,
+            inStock: row.product.inStock,
+            addedAt: row.createdAt.toISOString(),
+          }))}
+        />
       </section>
     </div>
   );

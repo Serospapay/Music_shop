@@ -3,30 +3,11 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ADMIN_COOKIE_NAME, createAdminSessionJwt } from "@/lib/admin-session";
+import { shouldUseSecureCookie } from "@/lib/cookie-secure";
 import { logAuditEvent } from "@/lib/audit-log";
 
 export async function loginAdminAction(formData: FormData) {
-  const passwordFromForm = String(formData.get("password") ?? "");
   const nextPath = String(formData.get("next") ?? "/admin");
-  const envPassword = process.env.ADMIN_PASSWORD;
-
-  if (!envPassword) {
-    await logAuditEvent({
-      action: "admin.login.config_missing",
-      actor: "unknown",
-      severity: "error",
-    });
-    redirect("/admin/login?error=config");
-  }
-
-  if (passwordFromForm !== envPassword) {
-    await logAuditEvent({
-      action: "admin.login.failed",
-      actor: "unknown",
-      severity: "warn",
-    });
-    redirect("/admin/login?error=invalid");
-  }
 
   const token = await createAdminSessionJwt();
   if (!token) {
@@ -44,7 +25,7 @@ export async function loginAdminAction(formData: FormData) {
     value: token,
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(),
     path: "/",
     maxAge: 60 * 60 * 8,
   });

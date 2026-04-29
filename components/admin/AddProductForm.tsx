@@ -5,10 +5,32 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { createProductAction } from "@/actions/adminProducts";
+import { createProductAction, updateProductAction } from "@/actions/adminProducts";
 import { adminProductSchema, type AdminProductValues } from "@/lib/validators/adminProduct";
 
-export function AddProductForm() {
+type AddProductFormProps = {
+  mode?: "create" | "edit";
+  productId?: string;
+  initialValues?: AdminProductValues;
+};
+
+const emptyDefaults: AdminProductValues = {
+  name: "",
+  slug: "",
+  description: "",
+  price: 0,
+  category: "",
+  brand: "",
+  sku: "",
+  highlightsText: "",
+  specsText: "",
+  warrantyMonths: 12,
+  imageUrl: "",
+  imageUrlsText: "",
+  inStock: true,
+};
+
+export function AddProductForm({ mode = "create", productId, initialValues }: AddProductFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [serverMessage, setServerMessage] = useState<{ type: "error" | "success"; text: string } | null>(
@@ -24,21 +46,7 @@ export function AddProductForm() {
     reset,
   } = useForm<AdminProductValues>({
     resolver: zodResolver(adminProductSchema),
-    defaultValues: {
-      name: "",
-      slug: "",
-      description: "",
-      price: 0,
-      category: "",
-      brand: "",
-      sku: "",
-      highlightsText: "",
-      specsText: "",
-      warrantyMonths: 12,
-      imageUrl: "",
-      imageUrlsText: "",
-      inStock: true,
-    },
+    defaultValues: initialValues ?? emptyDefaults,
     mode: "onBlur",
   });
 
@@ -78,10 +86,14 @@ export function AddProductForm() {
           imageUrl = uploadedPath;
         }
 
-        const result = await createProductAction({
+        const submitPayload = {
           ...values,
           imageUrl,
-        });
+        };
+        const result =
+          mode === "edit" && productId
+            ? await updateProductAction(productId, submitPayload)
+            : await createProductAction(submitPayload);
         if (!result.success) {
           setServerMessage({ type: "error", text: result.message });
           toast.error(result.message);
@@ -91,10 +103,20 @@ export function AddProductForm() {
         setServerMessage({ type: "success", text: result.message });
         toast.success(result.message);
         setSelectedFile(null);
-        reset();
-        router.refresh();
+        if (mode === "edit") {
+          router.push("/admin/products");
+          router.refresh();
+        } else {
+          reset();
+          router.refresh();
+        }
       } catch (error) {
-        const text = error instanceof Error ? error.message : "Не вдалося додати товар.";
+        const text =
+          error instanceof Error
+            ? error.message
+            : mode === "edit"
+              ? "Не вдалося оновити товар."
+              : "Не вдалося додати товар.";
         setServerMessage({ type: "error", text });
         toast.error(text);
       }
@@ -289,7 +311,7 @@ export function AddProductForm() {
         disabled={isDisabled}
         className="ui-btn-primary-block hover:scale-[1.01] disabled:hover:scale-100"
       >
-        {isDisabled ? "Збереження..." : "Додати товар"}
+        {isDisabled ? "Збереження..." : mode === "edit" ? "Зберегти зміни" : "Додати товар"}
       </button>
     </form>
   );

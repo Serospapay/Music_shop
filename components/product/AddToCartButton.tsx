@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
 import { useCartStore } from "@/store/cartStore";
 import { cn } from "@/lib/utils";
+import { showSuccessToast } from "@/lib/feedback-toast";
 
 type AddToCartButtonProps = {
   item: {
@@ -28,6 +28,7 @@ export function AddToCartButton({
   className,
 }: AddToCartButtonProps) {
   const [isAdded, setIsAdded] = useState(false);
+  const [isPressed, setIsPressed] = useState(false);
   const addItem = useCartStore((state) => state.addItem);
 
   const handleAddToCart = () => {
@@ -38,7 +39,13 @@ export function AddToCartButton({
     const qty = Math.max(1, Math.min(99, Math.floor(quantity)));
     addItem({ ...item, quantity: qty });
     setIsAdded(true);
-    toast.success(`Додано в кошик: ${qty} шт. — ${item.name}`);
+    setIsPressed(true);
+    showSuccessToast({
+      title: "Додано в кошик",
+      description: `${qty} шт. · ${item.name}`,
+    });
+    window.setTimeout(() => setIsAdded(false), 2200);
+    window.setTimeout(() => setIsPressed(false), 260);
   };
 
   const compact =
@@ -69,7 +76,14 @@ export function AddToCartButton({
       type="button"
       onClick={handleAddToCart}
       disabled={disabled}
-      className={cn(variantClass, variant === "premium" && !disabled && "hover:shadow-brand-sm", className)}
+      className={cn(
+        variantClass,
+        variant === "premium" && !disabled && "hover:shadow-brand-sm",
+        isAdded && "ring-2 ring-emerald-400/40",
+        isPressed && "scale-[0.99]",
+        "transform-gpu transition-all duration-200",
+        className,
+      )}
     >
       {label}
     </button>

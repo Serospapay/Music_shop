@@ -5,19 +5,19 @@ export const ADMIN_COOKIE_NAME = "admin_session";
 const JWT_ISSUER = "octave-admin";
 const JWT_AUDIENCE = "octave-admin-panel";
 
-function getSigningKeyBytes(): Uint8Array | null {
-  const material = process.env.ADMIN_SESSION_SECRET ?? process.env.ADMIN_PASSWORD;
-  if (!material) {
-    return null;
-  }
+/** Якщо не задано ADMIN_SESSION_SECRET / ADMIN_PASSWORD — підпис локальним ключем (демо; не для публічного продакшену). */
+const FALLBACK_ADMIN_SIGNING_MATERIAL = "octave-local-insecure-admin-jwt-v1";
+
+function getSigningKeyBytes(): Uint8Array {
+  const material =
+    process.env.ADMIN_SESSION_SECRET?.trim() ||
+    process.env.ADMIN_PASSWORD?.trim() ||
+    FALLBACK_ADMIN_SIGNING_MATERIAL;
   return new TextEncoder().encode(`octave-admin-jwt-v1:${material}`);
 }
 
 export async function createAdminSessionJwt(): Promise<string | null> {
   const key = getSigningKeyBytes();
-  if (!key) {
-    return null;
-  }
 
   return new SignJWT({ role: "admin" })
     .setProtectedHeader({ alg: "HS256" })
@@ -34,9 +34,6 @@ export async function verifyAdminSessionJwt(token: string): Promise<boolean> {
   }
 
   const key = getSigningKeyBytes();
-  if (!key) {
-    return false;
-  }
 
   try {
     await jwtVerify(token, key, {

@@ -24,13 +24,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const envPassword = process.env.ADMIN_PASSWORD;
-  if (!envPassword) {
-    const loginUrl = new URL("/admin/login", request.url);
-    loginUrl.searchParams.set("error", "config");
-    return NextResponse.redirect(loginUrl);
-  }
-
   const sessionToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value ?? "";
   const isValid = await verifyAdminSessionJwt(sessionToken);
 

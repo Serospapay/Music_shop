@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type SortSelectProps = {
-  value: "price-asc" | "price-desc";
+  value: "price-asc" | "price-desc" | "newest" | "name-asc";
 };
 
 export function SortSelect({ value }: SortSelectProps) {
@@ -13,7 +13,7 @@ export function SortSelect({ value }: SortSelectProps) {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  const onChange = (nextSort: "price-asc" | "price-desc") => {
+  const onChange = (nextSort: "price-asc" | "price-desc" | "newest" | "name-asc") => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("sort", nextSort);
     params.set("page", "1");
@@ -29,12 +29,16 @@ export function SortSelect({ value }: SortSelectProps) {
       <span className="whitespace-nowrap">Сортування:</span>
       <select
         value={value}
-        onChange={(event) => onChange(event.target.value as "price-asc" | "price-desc")}
+        onChange={(event) =>
+          onChange(event.target.value as "price-asc" | "price-desc" | "newest" | "name-asc")
+        }
         disabled={isPending}
         className="ui-input w-auto min-w-[11rem] py-2"
       >
         <option value="price-asc">Спочатку дешевші</option>
         <option value="price-desc">Спочатку дорожчі</option>
+        <option value="newest">Спочатку новинки</option>
+        <option value="name-asc">За назвою (А-Я)</option>
       </select>
     </label>
   );

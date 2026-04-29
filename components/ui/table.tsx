@@ -2,13 +2,14 @@ import { type ReactNode, type TdHTMLAttributes, type ThHTMLAttributes } from "re
 
 type TableProps = {
   className?: string;
+  tableClassName?: string;
   children: ReactNode;
 };
 
-export function Table({ className = "", children }: TableProps) {
+export function Table({ className = "", tableClassName = "", children }: TableProps) {
   return (
     <div className={`ui-table-shell ${className}`}>
-      <table className="w-full border-collapse md:min-w-[640px]">{children}</table>
+      <table className={`w-full border-collapse md:min-w-[760px] ${tableClassName}`}>{children}</table>
     </div>
   );
 }

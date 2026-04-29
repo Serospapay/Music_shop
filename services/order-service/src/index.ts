@@ -9,17 +9,43 @@ const checkoutItemSchema = z.object({
   quantity: z.number().int().min(1).max(99),
 });
 
+const deliveryMethodValues = [
+  "NOVA_POSHTA_WAREHOUSE",
+  "NOVA_POSHTA_COURIER",
+  "UKRPOSHTA",
+  "STORE_PICKUP",
+] as const;
+
+const paymentMethodValues = ["CASH_ON_DELIVERY", "ONLINE_CARD", "BANK_TRANSFER"] as const;
+
 const createOrderSchema = z.object({
   customerName: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(120),
   phone: z.string().trim().min(8).max(24),
   address: z.string().trim().min(8).max(300),
+  deliveryMethod: z.enum(deliveryMethodValues),
+  paymentMethod: z.enum(paymentMethodValues),
+  customerComment: z.string().trim().max(500).default(""),
   items: z.array(checkoutItemSchema).min(1),
   userId: z.string().optional(),
 });
 
 function roundMoney(n: number) {
   return Math.round(n * 100) / 100;
+}
+
+function getDeliveryFee(method: (typeof deliveryMethodValues)[number]): number {
+  switch (method) {
+    case "NOVA_POSHTA_COURIER":
+      return 180;
+    case "UKRPOSHTA":
+      return 90;
+    case "STORE_PICKUP":
+      return 0;
+    case "NOVA_POSHTA_WAREHOUSE":
+    default:
+      return 120;
+  }
 }
 
 function requireInternalAuth(authorization: string | undefined, token: string | undefined): boolean {
@@ -130,10 +156,10 @@ app.post("/orders", async (request, reply) => {
     });
   }
 
-  let totalAmount = 0;
+  let itemsSubtotal = 0;
   const orderItems = validation.lines.map((line) => {
     const lineTotal = roundMoney(line.unitPrice * line.quantity);
-    totalAmount = roundMoney(totalAmount + lineTotal);
+    itemsSubtotal = roundMoney(itemsSubtotal + lineTotal);
     return {
       productId: line.productId,
       quantity: line.quantity,
@@ -141,6 +167,8 @@ app.post("/orders", async (request, reply) => {
       productName: line.productName,
     };
   });
+  const deliveryFee = roundMoney(getDeliveryFee(parsed.data.deliveryMethod));
+  const totalAmount = roundMoney(itemsSubtotal + deliveryFee);
 
   try {
     const order = await prisma.$transaction(async (tx) => {
@@ -150,6 +178,11 @@ app.post("/orders", async (request, reply) => {
           email: parsed.data.email,
           phone: parsed.data.phone,
           address: parsed.data.address,
+          deliveryMethod: parsed.data.deliveryMethod,
+          paymentMethod: parsed.data.paymentMethod,
+          customerComment: parsed.data.customerComment || null,
+          deliveryFee,
+          adminQueuedAt: new Date(),
           totalAmount,
           status: "PENDING",
           userId: parsed.data.userId,
@@ -174,6 +207,7 @@ app.post("/orders", async (request, reply) => {
       success: true,
       orderId: order.id,
       totalAmount,
+      deliveryFee,
       items: orderItems.map((item) => ({
         productId: item.productId,
         name: item.productName,

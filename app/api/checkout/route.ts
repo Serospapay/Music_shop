@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { MongoClient, ObjectId } from "mongodb";
 import { prisma } from "@/lib/prisma";
 import { checkoutPayloadSchema } from "@/lib/validators/checkout";
-import { sendOrderConfirmation } from "@/lib/notifications";
+import { sendAdminOrderNotification, sendOrderConfirmation } from "@/lib/notifications";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/network";
 import { USER_COOKIE_NAME, verifyUserSessionJwt } from "@/lib/user-session";
+import { getDeliveryFee, type DeliveryMethod, type PaymentMethod } from "@/lib/checkout-options";
+import { logAuditEvent } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 
@@ -16,10 +20,29 @@ function roundMoney(n: number) {
   return Math.round(n * 100) / 100;
 }
 
+function isMongoReplicaSetError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2031";
+}
+
+function databaseNameFromUrl(url: string) {
+  try {
+    const normalized = url.replace(/^mongodb(\+srv)?:\/\//, "http://");
+    const parsed = new URL(normalized);
+    const path = parsed.pathname.replace(/^\//, "").split("?")[0];
+    if (path) {
+      return path;
+    }
+  } catch {
+    /* ignore */
+  }
+  return process.env.MONGO_DB_NAME?.trim() || "octave_shop";
+}
+
 type OrderServiceSuccess = {
   success: true;
   orderId: string;
   totalAmount: number;
+  deliveryFee: number;
   items: { productId: string; name: string | null; quantity: number; unitPrice: number }[];
 };
 
@@ -29,6 +52,9 @@ async function createOrderViaMicroservice(
     email: string;
     phone: string;
     address: string;
+    deliveryMethod: DeliveryMethod;
+    paymentMethod: PaymentMethod;
+    customerComment: string;
     items: { productId: string; quantity: number }[];
     userId?: string;
   },
@@ -52,6 +78,9 @@ async function createOrderViaMicroservice(
         email: payload.email,
         phone: payload.phone,
         address: payload.address,
+        deliveryMethod: payload.deliveryMethod,
+        paymentMethod: payload.paymentMethod,
+        customerComment: payload.customerComment,
         items: payload.items,
         ...(payload.userId ? { userId: payload.userId } : {}),
       }),
@@ -90,57 +119,64 @@ async function createOrderViaMonolith(
   parsedPayload: ReturnType<typeof checkoutPayloadSchema.parse>,
   orderUserId: string | undefined,
 ): Promise<OrderServiceSuccess> {
-  const result = await prisma.$transaction(async (tx) => {
-    const uniqueProductIds = Array.from(new Set(parsedPayload.items.map((item) => item.productId)));
-    const products = await tx.product.findMany({
-      where: {
-        id: { in: uniqueProductIds },
-      },
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        inStock: true,
-      },
-    });
+  const uniqueProductIds = Array.from(new Set(parsedPayload.items.map((item) => item.productId)));
+  const products = await prisma.product.findMany({
+    where: {
+      id: { in: uniqueProductIds },
+    },
+    select: {
+      id: true,
+      name: true,
+      price: true,
+      inStock: true,
+    },
+  });
 
-    if (products.length !== uniqueProductIds.length) {
+  if (products.length !== uniqueProductIds.length) {
+    throw new Error("PRODUCT_NOT_FOUND");
+  }
+
+  const productMap = new Map(products.map((product) => [product.id, product]));
+
+  for (const line of parsedPayload.items) {
+    const product = productMap.get(line.productId);
+    if (!product?.inStock) {
+      throw new Error("OUT_OF_STOCK");
+    }
+  }
+
+  let itemsSubtotal = 0;
+  const orderItems = parsedPayload.items.map((item) => {
+    const product = productMap.get(item.productId);
+    if (!product) {
       throw new Error("PRODUCT_NOT_FOUND");
     }
 
-    const productMap = new Map(products.map((product) => [product.id, product]));
+    const unitPrice = roundMoney(Number(product.price));
+    itemsSubtotal = roundMoney(itemsSubtotal + unitPrice * item.quantity);
 
-    for (const line of parsedPayload.items) {
-      const product = productMap.get(line.productId);
-      if (!product?.inStock) {
-        throw new Error("OUT_OF_STOCK");
-      }
-    }
+    return {
+      productId: item.productId,
+      quantity: item.quantity,
+      price: unitPrice,
+      productName: product.name,
+    };
+  });
+  const deliveryFee = roundMoney(getDeliveryFee(parsedPayload.deliveryMethod));
+  const totalAmount = roundMoney(itemsSubtotal + deliveryFee);
 
-    let totalAmount = 0;
-    const orderItems = parsedPayload.items.map((item) => {
-      const product = productMap.get(item.productId);
-      if (!product) {
-        throw new Error("PRODUCT_NOT_FOUND");
-      }
-
-      const unitPrice = roundMoney(Number(product.price));
-      totalAmount = roundMoney(totalAmount + unitPrice * item.quantity);
-
-      return {
-        productId: item.productId,
-        quantity: item.quantity,
-        price: unitPrice,
-        productName: product.name,
-      };
-    });
-
-    const order = await tx.order.create({
+  try {
+    const order = await prisma.order.create({
       data: {
         customerName: parsedPayload.customerName,
         email: parsedPayload.email,
         phone: parsedPayload.phone,
         address: parsedPayload.address,
+        deliveryMethod: parsedPayload.deliveryMethod,
+        paymentMethod: parsedPayload.paymentMethod,
+        customerComment: parsedPayload.customerComment || null,
+        deliveryFee,
+        adminQueuedAt: new Date(),
         totalAmount,
         status: "PENDING",
         userId: orderUserId,
@@ -150,7 +186,7 @@ async function createOrderViaMonolith(
       },
     });
 
-    await tx.orderItem.createMany({
+    await prisma.orderItem.createMany({
       data: orderItems.map((item) => ({
         orderId: order.id,
         productId: item.productId,
@@ -161,8 +197,10 @@ async function createOrderViaMonolith(
     });
 
     return {
+      success: true,
       orderId: order.id,
       totalAmount,
+      deliveryFee,
       items: orderItems.map((item) => ({
         productId: item.productId,
         name: item.productName,
@@ -170,9 +208,67 @@ async function createOrderViaMonolith(
         unitPrice: item.price,
       })),
     };
-  });
+  } catch (error) {
+    if (!isMongoReplicaSetError(error)) {
+      throw error;
+    }
 
-  return { success: true, ...result };
+    const url = process.env.DATABASE_URL;
+    if (!url) {
+      throw new Error("DATABASE_URL_MISSING");
+    }
+    const client = new MongoClient(url);
+    await client.connect();
+    try {
+      const db = client.db(databaseNameFromUrl(url));
+      const orderCollection = db.collection("Order");
+      const orderItemCollection = db.collection("OrderItem");
+      const now = new Date();
+
+      const insertedOrder = await orderCollection.insertOne({
+        customerName: parsedPayload.customerName,
+        email: parsedPayload.email,
+        phone: parsedPayload.phone,
+        address: parsedPayload.address,
+        deliveryMethod: parsedPayload.deliveryMethod,
+        paymentMethod: parsedPayload.paymentMethod,
+        customerComment: parsedPayload.customerComment || null,
+        deliveryFee,
+        adminQueuedAt: now,
+        totalAmount,
+        status: "PENDING",
+        createdAt: now,
+        ...(orderUserId ? { userId: new ObjectId(orderUserId) } : {}),
+      });
+
+      if (orderItems.length > 0) {
+        await orderItemCollection.insertMany(
+          orderItems.map((item) => ({
+            orderId: insertedOrder.insertedId,
+            productId: new ObjectId(item.productId),
+            productName: item.productName,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+        );
+      }
+
+      return {
+        success: true,
+        orderId: insertedOrder.insertedId.toHexString(),
+        totalAmount,
+        deliveryFee,
+        items: orderItems.map((item) => ({
+          productId: item.productId,
+          name: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.price,
+        })),
+      };
+    } finally {
+      await client.close();
+    }
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -221,19 +317,47 @@ export async function POST(request: NextRequest) {
         email: parsedPayload.data.email,
         phone: parsedPayload.data.phone,
         address: parsedPayload.data.address,
+        deliveryMethod: parsedPayload.data.deliveryMethod,
+        paymentMethod: parsedPayload.data.paymentMethod,
+        customerComment: parsedPayload.data.customerComment,
         items: parsedPayload.data.items,
         userId: orderUserId,
       });
       if (!remote.success) {
-        const st = remote.status;
-        const status =
-          st === 400 ? 400 : st === 503 ? 503 : st === 502 ? 502 : st && st >= 400 ? st : 500;
-        return NextResponse.json<CheckoutResult>(
-          { success: false, error: remote.error },
-          { status },
-        );
+        const st = remote.status ?? 500;
+        const shouldFallbackToMonolith = st >= 500;
+        if (shouldFallbackToMonolith) {
+          try {
+            result = await createOrderViaMonolith(parsedPayload.data, orderUserId);
+          } catch (fallbackError) {
+            if (fallbackError instanceof Error && fallbackError.message === "PRODUCT_NOT_FOUND") {
+              return NextResponse.json<CheckoutResult>(
+                { success: false, error: "Деякі товари не знайдено. Оновіть кошик." },
+                { status: 400 },
+              );
+            }
+            if (fallbackError instanceof Error && fallbackError.message === "OUT_OF_STOCK") {
+              return NextResponse.json<CheckoutResult>(
+                {
+                  success: false,
+                  error: "Один або кілька товарів недоступні. Оновіть кошик і спробуйте ще раз.",
+                },
+                { status: 400 },
+              );
+            }
+            throw fallbackError;
+          }
+        } else {
+          const status =
+            st === 400 ? 400 : st === 503 ? 503 : st === 502 ? 502 : st && st >= 400 ? st : 500;
+          return NextResponse.json<CheckoutResult>(
+            { success: false, error: remote.error },
+            { status },
+          );
+        }
+      } else {
+        result = remote;
       }
-      result = remote;
     } else {
       try {
         result = await createOrderViaMonolith(parsedPayload.data, orderUserId);
@@ -262,6 +386,10 @@ export async function POST(request: NextRequest) {
       customerName: parsedPayload.data.customerName,
       phone: parsedPayload.data.phone,
       address: parsedPayload.data.address,
+      deliveryMethod: parsedPayload.data.deliveryMethod,
+      paymentMethod: parsedPayload.data.paymentMethod,
+      customerComment: parsedPayload.data.customerComment,
+      deliveryFee: result.deliveryFee,
       totalAmount: result.totalAmount,
       items: result.items.map((item) => ({
         productId: item.productId,
@@ -281,6 +409,45 @@ export async function POST(request: NextRequest) {
         }),
       );
     }
+
+    const adminEmailOutcome = await sendAdminOrderNotification({
+      orderId: result.orderId,
+      customerName: parsedPayload.data.customerName,
+      phone: parsedPayload.data.phone,
+      address: parsedPayload.data.address,
+      deliveryMethod: parsedPayload.data.deliveryMethod,
+      paymentMethod: parsedPayload.data.paymentMethod,
+      customerComment: parsedPayload.data.customerComment,
+      deliveryFee: result.deliveryFee,
+      totalAmount: result.totalAmount,
+      items: result.items.map((item) => ({
+        productId: item.productId,
+        name: item.name ?? "Товар",
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
+    });
+    if (!adminEmailOutcome.sent) {
+      console.error(
+        JSON.stringify({
+          channel: "checkout",
+          event: "admin_order_email_not_sent",
+          orderId: result.orderId,
+          reason: adminEmailOutcome.reason,
+        }),
+      );
+    }
+
+    await logAuditEvent({
+      action: "checkout.order.queued_for_admin",
+      actor: orderUserId ?? parsedPayload.data.email.toLowerCase(),
+      details: {
+        orderId: result.orderId,
+        deliveryMethod: parsedPayload.data.deliveryMethod,
+        paymentMethod: parsedPayload.data.paymentMethod,
+        status: "PENDING",
+      },
+    });
 
     return NextResponse.json<CheckoutResult>({ success: true, orderId: result.orderId }, { status: 201 });
   } catch (error) {

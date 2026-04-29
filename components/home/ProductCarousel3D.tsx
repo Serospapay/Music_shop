@@ -193,6 +193,7 @@ export function ProductCarousel3D({ slides }: { slides: CarouselSlide[] }) {
                   src={s.imageUrl}
                   alt={s.name}
                   fill
+                  unoptimized
                   className="object-cover brightness-[0.92] transition duration-500 group-hover:scale-[1.03] group-hover:brightness-105"
                   sizes="(max-width:640px) 50vw, 200px"
                 />
@@ -222,6 +223,7 @@ export function ProductCarousel3D({ slides }: { slides: CarouselSlide[] }) {
               src={s.imageUrl}
               alt={s.name}
               fill
+              unoptimized
               className="object-cover brightness-[0.92] transition duration-500 group-hover:scale-[1.03] group-hover:brightness-105"
               sizes="(max-width:640px) 100vw, 400px"
             />
@@ -312,6 +314,7 @@ export function ProductCarousel3D({ slides }: { slides: CarouselSlide[] }) {
                         src={s.imageUrl}
                         alt={s.name}
                         fill
+                        unoptimized
                         className={`object-cover transition duration-500 ${isFront ? "brightness-105" : "brightness-[0.92]"}`}
                         sizes="(max-width:640px) 78vw, 320px"
                         draggable={false}

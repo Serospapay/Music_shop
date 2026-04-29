@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { ReviewStatus } from "@prisma/client";
 import { ADMIN_COOKIE_NAME } from "@/lib/admin-session";
 import { isValidAdminSession } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
@@ -41,5 +42,45 @@ export async function moderateReviewAction(
 
   revalidatePath("/admin/reviews");
   revalidatePath(`/product/${productSlug}`);
+  return { success: true };
+}
+
+const allowedStatuses: ReviewStatus[] = ["PENDING", "APPROVED", "REJECTED"];
+
+export async function updateReviewStatusAction(
+  reviewId: string,
+  status: string,
+): Promise<ModerateResult> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
+  if (!(await isValidAdminSession(token))) {
+    return { success: false, message: "Немає доступу." };
+  }
+
+  if (!allowedStatuses.includes(status as ReviewStatus)) {
+    return { success: false, message: "Некоректний статус відгуку." };
+  }
+
+  const review = await prisma.review.findUnique({
+    where: { id: reviewId },
+    select: { id: true, product: { select: { slug: true } } },
+  });
+  if (!review) {
+    return { success: false, message: "Відгук не знайдено." };
+  }
+
+  await prisma.review.update({
+    where: { id: reviewId },
+    data: { status: status as ReviewStatus },
+  });
+
+  await logAuditEvent({
+    action: "admin.review.update_status",
+    actor: "admin",
+    details: { reviewId, status },
+  });
+
+  revalidatePath("/admin/reviews");
+  revalidatePath(`/product/${review.product.slug}`);
   return { success: true };
 }

@@ -60,7 +60,19 @@ export default function RootLayout({ children }: RootLayoutProps) {
           <main className="flex-1">{children}</main>
           <Footer />
         </div>
-        <Toaster richColors theme="dark" position="top-center" />
+        <Toaster
+          richColors
+          theme="dark"
+          position="top-center"
+          toastOptions={{
+            className:
+              "border border-brand-500/25 bg-surface-900/95 text-zinc-100 shadow-[0_14px_36px_rgba(0,0,0,0.45)] backdrop-blur",
+            classNames: {
+              title: "text-sm font-semibold",
+              description: "text-xs text-zinc-300",
+            },
+          }}
+        />
       </body>
     </html>
   );

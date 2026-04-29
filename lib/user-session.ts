@@ -5,20 +5,20 @@ export const USER_COOKIE_NAME = "user_session";
 const JWT_ISSUER = "octave-user";
 const JWT_AUDIENCE = "octave-shop";
 
-function getUserSigningKeyBytes(): Uint8Array | null {
+/** Якщо не задано USER_SESSION_SECRET / ADMIN_SESSION_SECRET / ADMIN_PASSWORD — демо fallback (не для публічного продакшену). */
+const FALLBACK_USER_SIGNING_MATERIAL = "octave-local-insecure-user-jwt-v1";
+
+function getUserSigningKeyBytes(): Uint8Array {
   const material =
-    process.env.USER_SESSION_SECRET ?? process.env.ADMIN_SESSION_SECRET ?? process.env.ADMIN_PASSWORD;
-  if (!material) {
-    return null;
-  }
+    process.env.USER_SESSION_SECRET?.trim() ||
+    process.env.ADMIN_SESSION_SECRET?.trim() ||
+    process.env.ADMIN_PASSWORD?.trim() ||
+    FALLBACK_USER_SIGNING_MATERIAL;
   return new TextEncoder().encode(`octave-user-jwt-v1:${material}`);
 }
 
 export async function createUserSessionJwt(userId: string, email: string): Promise<string | null> {
   const key = getUserSigningKeyBytes();
-  if (!key) {
-    return null;
-  }
 
   return new SignJWT({ email })
     .setProtectedHeader({ alg: "HS256" })
@@ -38,9 +38,6 @@ export async function verifyUserSessionJwt(
   }
 
   const key = getUserSigningKeyBytes();
-  if (!key) {
-    return null;
-  }
 
   try {
     const { payload } = await jwtVerify(token, key, {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Check, X } from "lucide-react";
 import { moderateReviewAction } from "@/actions/adminReviewActions";
@@ -20,7 +21,9 @@ type ReviewModerationTableProps = {
 };
 
 export function ReviewModerationTable({ reviews }: ReviewModerationTableProps) {
+  const router = useRouter();
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [rows, setRows] = useState(reviews);
 
   const runModeration = async (reviewId: string, productSlug: string, decision: "approve" | "reject") => {
     setPendingIds((prev) => new Set(prev).add(reviewId));
@@ -31,7 +34,8 @@ export function ReviewModerationTable({ reviews }: ReviewModerationTableProps) {
         return;
       }
       toast.success(decision === "approve" ? "Відгук схвалено." : "Відгук відхилено.");
-      window.location.reload();
+      setRows((prev) => prev.filter((row) => row.id !== reviewId));
+      router.refresh();
     } catch {
       toast.error("Не вдалося зберегти зміни.");
     } finally {
@@ -43,7 +47,7 @@ export function ReviewModerationTable({ reviews }: ReviewModerationTableProps) {
     }
   };
 
-  if (reviews.length === 0) {
+  if (rows.length === 0) {
     return (
       <div className="ui-surface-inset mt-6 p-6 text-sm text-zinc-400">
         Немає відгуків, що очікують модерації.
@@ -53,7 +57,7 @@ export function ReviewModerationTable({ reviews }: ReviewModerationTableProps) {
 
   return (
     <div className="mt-8 space-y-4">
-      {reviews.map((r) => {
+      {rows.map((r) => {
         const busy = pendingIds.has(r.id);
         return (
           <article

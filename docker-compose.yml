@@ -104,7 +104,7 @@ services:
       ORDER_SERVICE_URL: http://order-service:4002
       SERVICE_INTERNAL_TOKEN: ${SERVICE_INTERNAL_TOKEN:-change-me-internal-token}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-in-production}
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-}
       USER_SESSION_SECRET: ${USER_SESSION_SECRET:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}

@@ -26,6 +26,28 @@ export async function submitReviewAction(payload: unknown): Promise<ReviewAction
     return { success: false, message: "Товар не знайдено." };
   }
 
+  const hasPurchased = await prisma.order.count({
+    where: {
+      items: {
+        some: {
+          productId: parsed.data.productId,
+        },
+      },
+      OR: [
+        { userId: user.id },
+        {
+          email: user.email.toLowerCase(),
+        },
+      ],
+    },
+  });
+  if (hasPurchased === 0) {
+    return {
+      success: false,
+      message: "Залишати відгук можуть лише покупці цього товару після оформлення замовлення.",
+    };
+  }
+
   await prisma.review.upsert({
     where: {
       productId_userId: {
